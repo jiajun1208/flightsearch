@@ -14,7 +14,7 @@ const firebaseConfig = {
     projectId: "avny-ccbe9",
     storageBucket: "avny-ccbe9.firebasestorage.app",
     messagingSenderId: "686829295344",
-    appId: "1:686829295344:web:6ac5c87b3d5f1b70701435",
+    appId: "1:686829295344:web:6ac5c87b3d5f1b70701435"
     // measurementId: "YOUR_MEASUREMENT_ID" // 如果有啟用 Google Analytics，請取消註解並填入
 };
 
