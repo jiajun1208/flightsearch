@@ -66,6 +66,12 @@ const AIRLINES = [
     { name: '東森快運航空', id: 'ETEX' },
 ];
 
+// 全域的星期名稱映射表
+const DAY_NAMES_MAP = {
+    "Mon": "星期一", "Tue": "星期二", "Wed": "星期三", "Thu": "星期四",
+    "Fri": "星期五", "Sat": "星期六", "Sun": "星期日"
+};
+
 // --- 工具函數 ---
 
 /**
@@ -97,15 +103,12 @@ const get24HourTime = (isoString) => {
  * @returns {string} 渲染成 HTML 標籤的星期幾字串
  */
 const formatDays = (daysArray) => {
-    const dayMap = {
-        "Mon": "一", "Tue": "二", "Wed": "三", "Thu": "四",
-        "Fri": "五", "Sat": "六", "Sun": "日"
-    };
+    // 現在使用全域的 DAY_NAMES_MAP
     return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => `
         <span class="inline-block w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
             daysArray.includes(day) ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'
-        }" title="${dayMap[day]}">
-            ${dayMap[day]}
+        }" title="${DAY_NAMES_MAP[day]}">
+            ${DAY_NAMES_MAP[day]}
         </span>
     `).join('');
 };
@@ -690,7 +693,7 @@ const renderFlightForm = () => {
                             <input type="checkbox" value="${day}"
                                 class="form-checkbox h-5 w-5 text-blue-600 rounded-md focus:ring-blue-500"
                                 ${formValues.availableDays.includes(day) ? 'checked' : ''} />
-                            <span class="ml-2 text-base">${{ Mon: '星期一', Tue: '星期二', Wed: '星期三', Thu: '星期四', Fri: '星期五', Sat: '星期六', Sun: '星期日' }[day]}</span>
+                            <span class="ml-2 text-base">${DAY_NAMES_MAP[day]}</span>
                         </label>
                     `).join('')}
                 </div>
@@ -806,7 +809,7 @@ const renderFlightForm = () => {
         if (appState.adminImageFile) {
             // 情況 A: 有新圖片被選取，上傳它
             try {
-                const storageRef = ref(storage, `airline_logos/${appState.adminImageFile.name}_${Date.now()}`);
+                const storageRef = ref(storage, `airline_logos/${appId}/${appState.adminImageFile.name}_${Date.now()}`); // 增加 appId 路徑
                 await uploadBytes(storageRef, appState.adminImageFile);
                 finalAirlineLogoUrl = await getDownloadURL(storageRef);
                 console.log("LOGO已上傳:", finalAirlineLogoUrl);
