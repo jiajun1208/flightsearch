@@ -75,6 +75,19 @@ const formatTime = (isoString) => {
 };
 
 /**
+ * 從 ISO 8601 時間字串中提取 HH:MM 格式的時間
+ * 適用於 <input type="time"> 的 value 屬性
+ * @param {string} isoString - ISO 8601 時間字串
+ * @returns {string} HH:MM 格式的時間字串
+ */
+const get24HourTime = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // 'en-GB' 確保 24 小時制
+};
+
+
+/**
  * 格式化航班的可用飛行日期 (例如: "一 二 三")
  * @param {string[]} daysArray - 包含星期幾縮寫 (Mon, Tue...) 的陣列
  * @returns {string} 渲染成 HTML 標籤的星期幾字串
@@ -219,7 +232,7 @@ const renderFlightSearch = () => {
             </div>
             <div class="flex-1">
                 <h3 class="text-lg font-semibold text-blue-900 mb-3">航空公司</h3>
-                <div id="airline-checkboxes" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div id="airline-checkboxes" class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
                     ${AIRLINES.map(airline => `
                         <label class="inline-flex items-center text-blue-900 cursor-pointer">
                             <input type="checkbox" value="${airline.name}"
@@ -477,13 +490,11 @@ const renderFlightForm = () => {
         availableDays: [],
     };
 
-    // 處理日期時間格式，以適應 input type="datetime-local"
-    if (flightData.departureTime) {
-        flightData.departureTime = new Date(flightData.departureTime).toISOString().substring(0, 16);
-    }
-    if (flightData.arrivalTime) {
-        flightData.arrivalTime = new Date(flightData.arrivalTime).toISOString().substring(0, 16);
-    }
+    // 處理日期時間格式，以適應 input type="time"
+    // 這裡使用 get24HourTime 確保只取時分
+    const displayDepartureTime = isEditing ? get24HourTime(flightData.departureTime) : '';
+    const displayArrivalTime = isEditing ? get24HourTime(flightData.arrivalTime) : '';
+
 
     const formDiv = document.createElement('div');
     formDiv.className = "bg-white p-8 rounded-2xl shadow-xl space-y-6 text-blue-900";
@@ -516,13 +527,13 @@ const renderFlightForm = () => {
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
-                    <label for="form-departureTime" class="block text-sm font-medium text-gray-700 mb-1">起飛時間</label>
-                    <input type="datetime-local" id="form-departureTime" name="departureTime" value="${flightData.departureTime}" required
+                    <label for="form-departureTime" class="block text-sm font-medium text-gray-700 mb-1">起飛時間 (時:分)</label>
+                    <input type="time" id="form-departureTime" name="departureTime" value="${displayDepartureTime}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                    <label for="form-arrivalTime" class="block text-sm font-medium text-gray-700 mb-1">降落時間</label>
-                    <input type="datetime-local" id="form-arrivalTime" name="arrivalTime" value="${flightData.arrivalTime}" required
+                    <label for="form-arrivalTime" class="block text-sm font-medium text-gray-700 mb-1">降落時間 (時:分)</label>
+                    <input type="time" id="form-arrivalTime" name="arrivalTime" value="${displayArrivalTime}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
@@ -606,8 +617,6 @@ const renderFlightForm = () => {
             departure: formDiv.querySelector('#form-departure').value,
             destination: formDiv.querySelector('#form-destination').value,
             flightDuration: formDiv.querySelector('#form-flightDuration').value,
-            departureTime: formDiv.querySelector('#form-departureTime').value,
-            arrivalTime: formDiv.querySelector('#form-arrivalTime').value,
             airlineName: formDiv.querySelector('#form-airlineName').value,
             // 如果沒有新圖片，保留原有的 URL，否則會被上傳邏輯覆蓋
             airlineLogoUrl: isEditing ? (appState.adminEditingFlight.airlineLogoUrl || '') : '',
@@ -615,6 +624,14 @@ const renderFlightForm = () => {
             aircraftType: formDiv.querySelector('#form-aircraftType').value,
             availableDays: Array.from(formDiv.querySelectorAll('#days-checkboxes input[type="checkbox"]:checked')).map(cb => cb.value),
         };
+
+        // 獲取時分值，並結合一個固定的日期轉換為 ISO 格式儲存
+        const departureTimeInput = formDiv.querySelector('#form-departureTime').value; // "HH:MM"
+        const arrivalTimeInput = formDiv.querySelector('#form-arrivalTime').value;     // "HH:MM"
+        const dummyDate = '2000-01-01'; // 使用固定日期，因為我們只關心時間部分
+        currentFormData.departureTime = new Date(`${dummyDate}T${departureTimeInput}:00`).toISOString();
+        currentFormData.arrivalTime = new Date(`${dummyDate}T${arrivalTimeInput}:00`).toISOString();
+
 
         try {
             // 如果有新圖片檔案，則上傳並獲取 URL
@@ -693,10 +710,7 @@ const setupFlightsListener = () => {
     }
 
     // 如果已經有監聽器且是針對同一個用戶，則無需重新設定
-    // 這裡我們假設每次 userId 變化都會觸發取消訂閱，所以可以直接設定
     if (unsubscribeFlightsListener) {
-        // 如果此時已經有監聽器，表示在 userId 變更時，前一個沒有被正確取消
-        // 這是為了防止極端情況下的重複監聽，但主要邏輯應確保正確的生命週期管理
         unsubscribeFlightsListener();
         unsubscribeFlightsListener = null;
         console.log("已取消先前的 Firestore 航班數據監聽器。");
