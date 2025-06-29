@@ -8,7 +8,7 @@ const {
 
 // === 在此處填入您的 Firebase 專案設定 (請務必替換佔位符!) ===
 const firebaseConfig = {
-   apiKey: "AIzaSyCZSC4KP9r9Ia74gjhVM4hkhkCiXU6ltR4",
+    apiKey: "AIzaSyCZSC4KP9r9Ia74gjhVM4hkhkCiXU6ltR4",
     authDomain: "avny-ccbe9.firebaseapp.com",
     databaseURL: "https://avny-ccbe9-default-rtdb.firebaseio.com",
     projectId: "avny-ccbe9",
@@ -36,7 +36,8 @@ const appState = {
     activeTab: 'search', // 當前活躍的頁籤: 'search' (航班搜尋) 或 'admin' (管理後台)
     currentUser: null, // 當前登入的用戶物件 (Firebase User)
     flights: [], // 從 Firestore 獲取的全部航班資料
-    loading: true, // 應用程式是否正在載入中
+    loading: true, // 應用程式是否正在載入中 (指 Firebase Auth 和初始設定)
+    flightsDataInitialized: false, // 新增狀態：true 表示初始 Firestore 航班數據已載入 (無論成功或失敗)
     error: null, // 應用程式是否有錯誤訊息
     userId: null, // 當前用戶的 Firebase UID (用於 Firestore 路徑)
 
@@ -303,14 +304,12 @@ const renderFlightSearch = () => {
 
     // 為搜尋欄位附加防抖的事件監聽器
     const departureInput = searchDiv.querySelector('#search-departure');
-    // 在 input 事件中更新 appState.searchDeparture, 並觸發防抖渲染
     departureInput.addEventListener('input', debounce((e) => {
         appState.searchDeparture = e.target.value; // 直接更新狀態
         updateAppStateAndRender({}); // 觸發渲染
     }, 300)); // 300ms 延遲
 
     const destinationInput = searchDiv.querySelector('#search-destination');
-    // 在 input 事件中更新 appState.searchDestination, 並觸發防抖渲染
     destinationInput.addEventListener('input', debounce((e) => {
         appState.searchDestination = e.target.value; // 直接更新狀態
         updateAppStateAndRender({}); // 觸發渲染
@@ -618,10 +617,13 @@ const renderFlightForm = () => {
                 <div id="logo-preview-container" class="mt-4 flex items-center space-x-3">
                     ${(appState.adminPreviewImage) ? `
                         <p class="text-gray-600">當前 LOGO 預覽:</p>
-                        <img src="${appState.adminPreviewImage}" alt="Logo Preview" class="w-20 h-20 object-contain rounded-lg border border-gray-300 shadow-sm" />
-                    ` : ''}
+                        <img id="current-logo-preview" src="${appState.adminPreviewImage}" alt="Logo Preview" class="w-20 h-20 object-contain rounded-lg border border-gray-300 shadow-sm" />
+                    ` : `
+                        <p class="text-gray-600" id="current-logo-preview-placeholder">沒有 LOGO 預覽</p>
+                        <img id="current-logo-preview" src="" alt="Logo Preview" class="hidden w-20 h-20 object-contain rounded-lg border border-gray-300 shadow-sm" />
+                    `}
                 </div>
-                ${appState.adminImageFile ? '<p class="text-sm text-blue-600 mt-2">已選擇檔案: ' + appState.adminImageFile.name + '</p>' : ''}
+                ${appState.adminImageFile ? '<p class="text-sm text-blue-600 mt-2" id="file-chosen-message">已選擇檔案: ' + appState.adminImageFile.name + '</p>' : '<p class="text-sm text-blue-600 mt-2" id="file-chosen-message"></p>'}
                 <p class="text-sm text-gray-500 mt-2">注意: 上傳圖片後，文件選擇框可能會顯示"未選擇任何檔案"，但圖片已成功載入預覽。</p>
             </div>
 
@@ -654,6 +656,10 @@ const renderFlightForm = () => {
 
     const formElement = formDiv.querySelector('#flight-form');
     const imageInput = formDiv.querySelector('#form-airlineLogo');
+    const logoPreviewImg = formDiv.querySelector('#current-logo-preview');
+    const logoPreviewPlaceholder = formDiv.querySelector('#current-logo-preview-placeholder');
+    const fileChosenMessage = formDiv.querySelector('#file-chosen-message');
+
 
     // 為所有輸入欄位附加事件監聽器，更新 appState.adminCurrentFormValues
     // 這裡不觸發 updateAppStateAndRender，以避免表單重新繪製
@@ -678,22 +684,47 @@ const renderFlightForm = () => {
     });
 
 
-    // 為圖片輸入框附加事件監聽器，處理圖片預覽（這裡需要觸發重新渲染來更新預覽圖）
+    // 為圖片輸入框附加事件監聽器，處理圖片預覽
     imageInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             appState.adminImageFile = file; // 將檔案儲存到狀態中
             const reader = new FileReader();
             reader.onload = (e) => {
-                updateAppStateAndRender({ adminPreviewImage: e.target.result }); // 更新預覽圖片 URL 並觸發渲染
+                // 直接更新 DOM，不觸發整個應用程式重新渲染
+                if (logoPreviewImg) {
+                    logoPreviewImg.src = e.target.result;
+                    logoPreviewImg.classList.remove('hidden'); // 顯示圖片
+                    if (logoPreviewPlaceholder) logoPreviewPlaceholder.classList.add('hidden'); // 隱藏佔位符
+                }
+                if (fileChosenMessage) {
+                    fileChosenMessage.textContent = '已選擇檔案: ' + file.name;
+                }
+                appState.adminPreviewImage = e.target.result; // 更新狀態中的預覽 URL
             };
             reader.readAsDataURL(file);
         } else {
             appState.adminImageFile = null;
             // 如果沒有選擇新檔案，且是在編輯模式，則恢復舊的預覽圖；否則清空
-            updateAppStateAndRender({ adminPreviewImage: appState.adminEditingFlight ? (appState.adminEditingFlight.airlineLogoUrl || '') : '' });
+            const defaultPreviewUrl = appState.adminEditingFlight ? (appState.adminEditingFlight.airlineLogoUrl || '') : '';
+            if (logoPreviewImg) {
+                logoPreviewImg.src = defaultPreviewUrl;
+                if (!defaultPreviewUrl) {
+                    logoPreviewImg.classList.add('hidden'); // 如果沒有預覽圖，隱藏圖片
+                    if (logoPreviewPlaceholder) logoPreviewPlaceholder.classList.remove('hidden'); // 顯示佔位符
+                } else {
+                    logoPreviewImg.classList.remove('hidden'); // 顯示圖片
+                    if (logoPreviewPlaceholder) logoPreviewPlaceholder.classList.add('hidden'); // 隱藏佔位符
+                }
+            }
+            if (fileChosenMessage) {
+                fileChosenMessage.textContent = '';
+            }
+            appState.adminPreviewImage = defaultPreviewUrl; // 更新狀態
         }
+        // !!! 這裡不再呼叫 updateAppStateAndRender() 以避免重繪表單導致輸入內容消失 !!!
     });
+
 
     // 為表單提交附加事件監聽器
     formElement.addEventListener('submit', async (e) => {
@@ -715,10 +746,10 @@ const renderFlightForm = () => {
         currentFormData.flightDuration = calculateDuration(departureTimeInput, arrivalTimeInput);
 
 
-        // *** 修正 LOGO URL 處理邏輯 ***
+        // *** 修正 LOGO URL 處理邏輯 (重要！) ***
         let finalAirlineLogoUrl = '';
         if (appState.adminImageFile) {
-            // 有新圖片被選取，上傳它
+            // 情況 A: 有新圖片被選取，上傳它
             try {
                 const storageRef = ref(storage, `airline_logos/${appState.adminImageFile.name}_${Date.now()}`);
                 await uploadBytes(storageRef, appState.adminImageFile);
@@ -730,9 +761,11 @@ const renderFlightForm = () => {
                 return; // 上傳失敗則停止提交
             }
         } else if (appState.adminEditingFlight && appState.adminEditingFlight.airlineLogoUrl) {
-            // 沒有新圖片，但處於編輯模式且有舊 LOGO URL，則保留舊的
+            // 情況 B: 沒有新圖片，但處於編輯模式且有舊 LOGO URL，則保留舊的
             finalAirlineLogoUrl = appState.adminEditingFlight.airlineLogoUrl;
         }
+        // 情況 C: 沒有新圖片，也不是編輯模式下的舊圖片 (例如新增模式且未選圖片)，則 finalAirlineLogoUrl 保持空字串
+        
         // 將最終確定的 LOGO URL 賦值給表單數據
         currentFormData.airlineLogoUrl = finalAirlineLogoUrl;
 
@@ -774,8 +807,16 @@ const renderApp = () => {
     const mainContent = document.createElement('main');
     mainContent.className = "flex-grow p-6";
 
-    // 根據 activeTab 渲染主要內容區域
-    if (appState.activeTab === 'search') {
+    // 根據載入狀態和數據初始化狀態來顯示內容
+    if (appState.loading) {
+        mainContent.innerHTML = `<div class="min-h-screen flex items-center justify-center text-white text-2xl">載入中...</div>`;
+    } else if (appState.error) {
+        mainContent.innerHTML = `<div class="min-h-screen flex items-center justify-center text-red-500 text-2xl">錯誤: ${appState.error}</div>`;
+    } else if (!appState.flightsDataInitialized && appState.activeTab === 'search') {
+        // 顯示訊息，直到初始航班數據載入完成
+        mainContent.innerHTML = `<div class="min-h-screen flex items-center justify-center text-white text-2xl">載入航班資料中，請稍候...</div>`;
+    }
+    else if (appState.activeTab === 'search') {
         mainContent.appendChild(renderFlightSearch());
     } else if (appState.activeTab === 'admin') {
         if (appState.currentUser) {
@@ -820,11 +861,11 @@ const setupFlightsListener = () => {
     unsubscribeFlightsListener = onSnapshot(q, (snapshot) => {
         const flightsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log("Firestore 數據更新:", flightsData);
-        // 使用 updateAppStateAndRender 觸發 UI 更新
-        updateAppStateAndRender({ flights: flightsData });
+        // 使用 updateAppStateAndRender 觸發 UI 更新，並標記數據已初始化
+        updateAppStateAndRender({ flights: flightsData, flightsDataInitialized: true });
     }, (err) => {
         console.error("監聽航班數據失敗:", err);
-        updateAppStateAndRender({ error: "無法載入航班數據。" });
+        updateAppStateAndRender({ error: "無法載入航班數據。", flightsDataInitialized: true }); // 即使失敗也標記為已嘗試初始化
     });
     console.log(`Firestore 航班數據監聽器已啟動 for user: ${appState.userId}`);
 };
@@ -833,7 +874,6 @@ const setupFlightsListener = () => {
 // 頁面載入完成後執行主邏輯
 window.addEventListener('load', async () => {
     // 初始渲染應用程式的外殼，顯示載入中訊息
-    // 這一步很重要，確保用戶在 Firebase 載入期間看到內容
     renderApp();
 
     let initialAuthResolved = false; // 標記初始認證是否已處理
