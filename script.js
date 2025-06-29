@@ -8,7 +8,7 @@ const {
 
 // === 在此處填入您的 Firebase 專案設定 (請務必替換佔位符!) ===
 const firebaseConfig = {
-    apiKey: "AIzaSyCZSC4KP9r9Ia74gjhVM4hkhkCiXU6ltR4",
+   apiKey: "AIzaSyCZSC4KP9r9Ia74gjhVM4hkhkCiXU6ltR4",
     authDomain: "avny-ccbe9.firebaseapp.com",
     databaseURL: "https://avny-ccbe9-default-rtdb.firebaseio.com",
     projectId: "avny-ccbe9",
@@ -504,8 +504,8 @@ const renderAdminPanel = () => {
                 adminImageFile: null,
                 adminPreviewImage: '',
                 adminCurrentFormValues: { // 初始化表單值
-                    departure: '', destination: '', // 這些也應該是空字串
-                    departureTime: '', arrivalTime: '', // 時分輸入框預設空
+                    departure: '', destination: '',
+                    departureTime: '', arrivalTime: '',
                     airlineName: '', flightNumber: '', aircraftType: '',
                     availableDays: []
                 }
@@ -591,7 +591,7 @@ const renderFlightForm = () => {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"> // 修改為 grid-cols-2 因為移除了飛行時長
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label for="form-departureTime" class="block text-sm font-medium text-gray-700 mb-1">起飛時間 (僅時分)</label>
                     <input type="time" id="form-departureTime" name="departureTime" value="${formValues.departureTime || ''}" required
@@ -719,10 +719,16 @@ const renderFlightForm = () => {
         let finalAirlineLogoUrl = '';
         if (appState.adminImageFile) {
             // 有新圖片被選取，上傳它
-            const storageRef = ref(storage, `airline_logos/${appState.adminImageFile.name}_${Date.now()}`);
-            await uploadBytes(storageRef, appState.adminImageFile);
-            finalAirlineLogoUrl = await getDownloadURL(storageRef);
-            console.log("LOGO已上傳:", finalAirlineLogoUrl);
+            try {
+                const storageRef = ref(storage, `airline_logos/${appState.adminImageFile.name}_${Date.now()}`);
+                await uploadBytes(storageRef, appState.adminImageFile);
+                finalAirlineLogoUrl = await getDownloadURL(storageRef);
+                console.log("LOGO已上傳:", finalAirlineLogoUrl);
+            } catch (storageError) {
+                console.error("LOGO上傳失敗:", storageError);
+                updateAppStateAndRender({ adminMessage: `LOGO上傳失敗: ${storageError.message}` });
+                return; // 上傳失敗則停止提交
+            }
         } else if (appState.adminEditingFlight && appState.adminEditingFlight.airlineLogoUrl) {
             // 沒有新圖片，但處於編輯模式且有舊 LOGO URL，則保留舊的
             finalAirlineLogoUrl = appState.adminEditingFlight.airlineLogoUrl;
