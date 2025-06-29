@@ -123,6 +123,43 @@ const debounce = (func, delay) => {
 };
 
 /**
+ * 計算兩個時間點之間的飛行時長 (格式為 "XhYm")
+ * 假設跨日的情況，如果抵達時間早於起飛時間，則假定抵達日為起飛日的隔天
+ * @param {string} departureTime - HH:MM 格式的起飛時間
+ * @param {string} arrivalTime - HH:MM 格式的抵達時間
+ * @returns {string} 飛行時長字串 (例如 "2h30m") 或空字串
+ */
+const calculateDuration = (departureTime, arrivalTime) => {
+    if (!departureTime || !arrivalTime) return '';
+
+    // 使用一個固定的日期，因為我們只關心時間差，不關心實際日期
+    const dummyDate = '2000-01-01';
+    const depDateTime = new Date(`${dummyDate}T${departureTime}:00`);
+    let arrDateTime = new Date(`${dummyDate}T${arrivalTime}:00`);
+
+    // 如果抵達時間早於起飛時間，則假定是隔天抵達
+    if (arrDateTime < depDateTime) {
+        arrDateTime.setDate(arrDateTime.getDate() + 1);
+    }
+
+    const diffMs = arrDateTime.getTime() - depDateTime.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    let durationString = '';
+    if (diffHours > 0) {
+        durationString += `${diffHours}h`;
+    }
+    if (diffMinutes > 0) {
+        durationString += `${diffMinutes}m`;
+    }
+    if (durationString === '' && (diffHours === 0 && diffMinutes === 0)) {
+        return '0m'; // 如果時間完全相同，顯示為 0m
+    }
+    return durationString;
+};
+
+/**
  * 更新應用程式狀態並觸發重新渲染
  * @param {object} newState - 要更新的 appState 部分
  */
@@ -467,9 +504,9 @@ const renderAdminPanel = () => {
                 adminImageFile: null,
                 adminPreviewImage: '',
                 adminCurrentFormValues: { // 初始化表單值
-                    departure: '', destination: '', flightDuration: '',
-                    departureTime: '', arrivalTime: '', airlineName: '',
-                    airlineLogoUrl: '', flightNumber: '', aircraftType: '',
+                    departure: '', destination: '', // 這些也應該是空字串
+                    departureTime: '', arrivalTime: '', // 時分輸入框預設空
+                    airlineName: '', flightNumber: '', aircraftType: '',
                     availableDays: []
                 }
             });
@@ -554,7 +591,7 @@ const renderFlightForm = () => {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"> // 修改為 grid-cols-2 因為移除了飛行時長
                 <div>
                     <label for="form-departureTime" class="block text-sm font-medium text-gray-700 mb-1">起飛時間 (僅時分)</label>
                     <input type="time" id="form-departureTime" name="departureTime" value="${formValues.departureTime || ''}" required
@@ -565,12 +602,8 @@ const renderFlightForm = () => {
                     <input type="time" id="form-arrivalTime" name="arrivalTime" value="${formValues.arrivalTime || ''}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                <div>
-                    <label for="form-flightDuration" class="block text-sm font-medium text-gray-700 mb-1">飛行時長 (例如: 2h30m)</label>
-                    <input type="text" id="form-flightDuration" name="flightDuration" value="${formValues.flightDuration || ''}" required
-                        class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
             </div>
+            <!-- 飛行時長欄位已移除，將自動計算 -->
 
             <div class="mb-4">
                 <label for="form-airlineName" class="block text-sm font-medium text-gray-700 mb-1">航空公司名稱</label>
@@ -672,22 +705,33 @@ const renderFlightForm = () => {
 
         // 獲取時分值，並結合一個固定的日期轉換為 ISO 格式儲存
         // 檢查時間輸入是否為空，避免創建無效日期
-        currentFormData.departureTime = currentFormData.departureTime ? new Date(`2000-01-01T${currentFormData.departureTime}:00`).toISOString() : '';
-        currentFormData.arrivalTime = currentFormData.arrivalTime ? new Date(`2000-01-01T${currentFormData.arrivalTime}:00`).toISOString() : '';
+        const departureTimeInput = currentFormData.departureTime;
+        const arrivalTimeInput = currentFormData.arrivalTime;
 
-        // 保留現有的 airlineLogoUrl，除非有新檔案上傳
-        currentFormData.airlineLogoUrl = appState.adminEditingFlight ? (appState.adminEditingFlight.airlineLogoUrl || '') : '';
+        currentFormData.departureTime = departureTimeInput ? new Date(`2000-01-01T${departureTimeInput}:00`).toISOString() : '';
+        currentFormData.arrivalTime = arrivalTimeInput ? new Date(`2000-01-01T${arrivalTimeInput}:00`).toISOString() : '';
+
+        // 計算飛行時長
+        currentFormData.flightDuration = calculateDuration(departureTimeInput, arrivalTimeInput);
+
+
+        // *** 修正 LOGO URL 處理邏輯 ***
+        let finalAirlineLogoUrl = '';
+        if (appState.adminImageFile) {
+            // 有新圖片被選取，上傳它
+            const storageRef = ref(storage, `airline_logos/${appState.adminImageFile.name}_${Date.now()}`);
+            await uploadBytes(storageRef, appState.adminImageFile);
+            finalAirlineLogoUrl = await getDownloadURL(storageRef);
+            console.log("LOGO已上傳:", finalAirlineLogoUrl);
+        } else if (appState.adminEditingFlight && appState.adminEditingFlight.airlineLogoUrl) {
+            // 沒有新圖片，但處於編輯模式且有舊 LOGO URL，則保留舊的
+            finalAirlineLogoUrl = appState.adminEditingFlight.airlineLogoUrl;
+        }
+        // 將最終確定的 LOGO URL 賦值給表單數據
+        currentFormData.airlineLogoUrl = finalAirlineLogoUrl;
 
 
         try {
-            // 如果有新圖片檔案，則上傳並獲取 URL
-            if (appState.adminImageFile) {
-                const storageRef = ref(storage, `airline_logos/${appState.adminImageFile.name}_${Date.now()}`);
-                await uploadBytes(storageRef, appState.adminImageFile);
-                currentFormData.airlineLogoUrl = await getDownloadURL(storageRef);
-                console.log("LOGO已上傳:", currentFormData.airlineLogoUrl);
-            }
-
             // 執行 Firestore 操作 (更新或新增)
             if (appState.adminEditingFlight) {
                 await updateDoc(doc(db, `artifacts/${appId}/public/data/flights`, appState.adminEditingFlight.id), currentFormData);
