@@ -46,6 +46,7 @@ const appState = {
     searchDestination: '', // 搜尋的目的地機場
     searchSelectedAirlines: [], // 搜尋選中的航空公司列表
     hasSearched: false, // 新增狀態：是否已執行過搜尋，控制結果顯示
+    sortOrder: 'departureTime', // 新增狀態：搜尋結果的排序方式 ('departureTime', 'airlineGroup')
 
     // 管理表單的狀態
     adminEditingFlight: null, // 正在編輯的航班物件 (如果為 null 則為新增模式)
@@ -307,6 +308,15 @@ const renderFlightSearch = () => {
                 </button>
             </div>
         </div>
+        
+        <div class="bg-white p-4 rounded-xl shadow-xl max-w-4xl mx-auto mb-6 flex justify-end">
+            <label for="sort-select" class="block text-sm font-medium text-gray-700 mr-2 self-center">排序方式:</label>
+            <select id="sort-select" class="p-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-900">
+                <option value="departureTime" ${appState.sortOrder === 'departureTime' ? 'selected' : ''}>依起飛時間 (最早)</option>
+                <option value="airlineGroup" ${appState.sortOrder === 'airlineGroup' ? 'selected' : ''}>依航空公司分組</option>
+            </select>
+        </div>
+
         <div id="flight-results-container"></div>
     `;
 
@@ -339,15 +349,36 @@ const renderFlightSearch = () => {
         updateAppStateAndRender({ hasSearched: true });
     });
 
+    // 排序下拉選單的事件監聽器
+    searchDiv.querySelector('#sort-select').addEventListener('change', (e) => {
+        updateAppStateAndRender({ sortOrder: e.target.value });
+    });
+
+
     const resultsContainer = searchDiv.querySelector('#flight-results-container');
     if (appState.hasSearched) {
         // 根據當前的 appState 進行航班過濾
-        const currentFilteredFlights = appState.flights.filter(flight => {
+        let currentFilteredFlights = appState.flights.filter(flight => {
             const matchDeparture = appState.searchDeparture === '' || flight.departure.toLowerCase().includes(appState.searchDeparture.toLowerCase());
             const matchDestination = appState.searchDestination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
             const matchAirline = appState.searchSelectedAirlines.length === 0 || appState.searchSelectedAirlines.includes(flight.airlineName);
             return matchDeparture && matchDestination && matchAirline;
         });
+
+        // 根據選擇的排序方式進行排序
+        if (appState.sortOrder === 'departureTime') {
+            currentFilteredFlights.sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
+        } else if (appState.sortOrder === 'airlineGroup') {
+            currentFilteredFlights.sort((a, b) => {
+                const airlineCompare = a.airlineName.localeCompare(b.airlineName);
+                if (airlineCompare === 0) {
+                    // 如果航空公司相同，則按起飛時間排序
+                    return new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime();
+                }
+                return airlineCompare;
+            });
+        }
+
         resultsContainer.appendChild(renderFlightResults(currentFilteredFlights));
     } else {
         // 初始狀態或未搜尋時顯示提示
