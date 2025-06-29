@@ -1,0 +1,44 @@
+/* Custom styles can go here. Tailwind CSS will handle most of the styling. */
+/* This file is primarily for global overrides or very specific non-Tailwind styles. */
+
+/* Example: Basic reset or font smoothing */
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide scrollbar for a cleaner look if desired, but keep functionality */
+/* For WebKit browsers (Chrome, Safari) */
+::-webkit-scrollbar {
+    width: 8px; /* For vertical scrollbars */
+    height: 8px; /* For horizontal scrollbars */
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* For Firefox */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(0, 0, 0, 0.1);
+}
+
+/* General form element focus styles */
+input:focus,
+button:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); /* Blue-500 with 50% opacity */
+}
