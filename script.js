@@ -527,12 +527,12 @@ const renderFlightForm = () => {
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
-                    <label for="form-departureTime" class="block text-sm font-medium text-gray-700 mb-1">起飛時間 (時:分)</label>
+                    <label for="form-departureTime" class="block text-sm font-medium text-gray-700 mb-1">起飛時間 (僅時分)</label>
                     <input type="time" id="form-departureTime" name="departureTime" value="${displayDepartureTime}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                    <label for="form-arrivalTime" class="block text-sm font-medium text-gray-700 mb-1">降落時間 (時:分)</label>
+                    <label for="form-arrivalTime" class="block text-sm font-medium text-gray-700 mb-1">降落時間 (僅時分)</label>
                     <input type="time" id="form-arrivalTime" name="arrivalTime" value="${displayArrivalTime}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
