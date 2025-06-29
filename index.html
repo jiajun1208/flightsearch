@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>七岩維出境航班查詢網</title>
+    <!-- Favicon - 網站圖示 (已新增) -->
+    <link rel="icon" href="https://placehold.co/32x32/0A1931/FFFFFF?text=F" type="image/png">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Custom Styles -->
@@ -38,11 +40,6 @@
             getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, where,
             getStorage, ref, uploadBytes, getDownloadURL
         };
-
-        // Pass Firebase config and app ID (replace with actual values if not in a Canvas env)
-        window.__firebase_config = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
-        window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
     </script>
     <!-- Main Application Script -->
     <script src="script.js" defer></script>
