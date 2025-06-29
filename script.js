@@ -6,7 +6,7 @@ const {
     getStorage, ref, uploadBytes, getDownloadURL
 } = window.firebase;
 
-// === 在此處填入您的 Firebase 專案設定 ===
+// === 在此處填入您的 Firebase 專案設定 (請務必替換佔位符!) ===
 const firebaseConfig = {
     apiKey: "AIzaSyCZSC4KP9r9Ia74gjhVM4hkhkCiXU6ltR4",
     authDomain: "avny-ccbe9.firebaseapp.com",
@@ -18,7 +18,7 @@ const firebaseConfig = {
     // measurementId: "YOUR_MEASUREMENT_ID" // 如果有啟用 Google Analytics，請取消註解並填入
 };
 
-// 從 firebaseConfig 中獲取 appId
+// 從 firebaseConfig 中獲取 appId。確保上述 appId 已被正確填寫。
 const appId = firebaseConfig.appId;
 
 // 如果您有自訂認證令牌，請在此處填入。如果沒有，請設為 null。
@@ -104,6 +104,21 @@ const formatDays = (daysArray) => {
             ${dayMap[day]}
         </span>
     `).join('');
+};
+
+/**
+ * 防抖函數：在事件觸發後延遲執行函數，如果在延遲時間內再次觸發，則重置計時器。
+ * @param {Function} func - 要防抖的函數
+ * @param {number} delay - 延遲時間 (毫秒)
+ * @returns {Function} 防抖後的函數
+ */
+const debounce = (func, delay) => {
+    let timeout;
+    return function(...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
 };
 
 /**
@@ -247,12 +262,21 @@ const renderFlightSearch = () => {
         <div id="flight-results-container"></div>
     `;
 
-    // 為搜尋欄位附加事件監聽器，當值改變時更新 appState 並觸發重新渲染
-    searchDiv.querySelector('#search-departure').addEventListener('input', (e) => {
-        updateAppStateAndRender({ searchDeparture: e.target.value });
+    // 為搜尋欄位附加防抖的事件監聽器
+    const departureInput = searchDiv.querySelector('#search-departure');
+    const debouncedSetDeparture = debounce((value) => {
+        updateAppStateAndRender({ searchDeparture: value });
+    }, 300); // 300ms 延遲
+    departureInput.addEventListener('input', (e) => {
+        debouncedSetDeparture(e.target.value);
     });
-    searchDiv.querySelector('#search-destination').addEventListener('input', (e) => {
-        updateAppStateAndRender({ searchDestination: e.target.value });
+
+    const destinationInput = searchDiv.querySelector('#search-destination');
+    const debouncedSetDestination = debounce((value) => {
+        updateAppStateAndRender({ searchDestination: value });
+    }, 300); // 300ms 延遲
+    destinationInput.addEventListener('input', (e) => {
+        debouncedSetDestination(e.target.value);
     });
 
     searchDiv.querySelector('#airline-checkboxes').addEventListener('change', (e) => {
@@ -269,7 +293,6 @@ const renderFlightSearch = () => {
     });
 
     // 根據當前的 appState 進行航班過濾
-    // 注意：這裡直接計算並將結果傳遞給 renderFlightResults，不觸發額外渲染
     const currentFilteredFlights = appState.flights.filter(flight => {
         const matchDeparture = appState.searchDeparture === '' || flight.departure.toLowerCase().includes(appState.searchDeparture.toLowerCase());
         const matchDestination = appState.searchDestination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
@@ -629,8 +652,9 @@ const renderFlightForm = () => {
         const departureTimeInput = formDiv.querySelector('#form-departureTime').value; // "HH:MM"
         const arrivalTimeInput = formDiv.querySelector('#form-arrivalTime').value;     // "HH:MM"
         const dummyDate = '2000-01-01'; // 使用固定日期，因為我們只關心時間部分
-        currentFormData.departureTime = new Date(`${dummyDate}T${departureTimeInput}:00`).toISOString();
-        currentFormData.arrivalTime = new Date(`${dummyDate}T${arrivalTimeInput}:00`).toISOString();
+        // 檢查時間輸入是否為空，避免創建無效日期
+        currentFormData.departureTime = departureTimeInput ? new Date(`${dummyDate}T${departureTimeInput}:00`).toISOString() : '';
+        currentFormData.arrivalTime = arrivalTimeInput ? new Date(`${dummyDate}T${arrivalTimeInput}:00`).toISOString() : '';
 
 
         try {
@@ -652,6 +676,7 @@ const renderFlightForm = () => {
             }
         } catch (e) {
             console.error("操作航班失敗:", e);
+            // 顯示更詳細的錯誤訊息給用戶
             updateAppStateAndRender({ adminMessage: `操作航班失敗: ${e.message}` });
         }
     });
