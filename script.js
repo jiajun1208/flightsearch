@@ -98,6 +98,7 @@ const formatDays = (daysArray) => {
  * @param {object} newState - 要更新的 appState 部分
  */
 const updateAppStateAndRender = (newState) => {
+    // 使用 Object.assign 智慧地合併狀態，而不是直接替換物件
     Object.assign(appState, newState);
     renderApp(); // 每次狀態改變時呼叫主渲染函數
 };
@@ -145,7 +146,15 @@ const renderHeader = () => {
         header.querySelector('#nav-logout').addEventListener('click', async () => {
             try {
                 await signOut(auth);
-                updateAppStateAndRender({ activeTab: 'search' }); // 登出後回到搜尋頁面
+                // 登出後，將 activeTab 設為 'search'，並重設 admin 相關狀態
+                updateAppStateAndRender({
+                    activeTab: 'search',
+                    adminEditingFlight: null,
+                    adminShowForm: false,
+                    adminMessage: '',
+                    adminImageFile: null,
+                    adminPreviewImage: ''
+                });
             } catch (error) {
                 console.error("登出失敗:", error);
                 // 實際應用中請使用自定義模態框替代 alert
@@ -250,7 +259,7 @@ const renderFlightSearch = () => {
     // 注意：這裡直接計算並將結果傳遞給 renderFlightResults，不觸發額外渲染
     const currentFilteredFlights = appState.flights.filter(flight => {
         const matchDeparture = appState.searchDeparture === '' || flight.departure.toLowerCase().includes(appState.searchDeparture.toLowerCase());
-        const matchDestination = appState.destination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
+        const matchDestination = appState.searchDestination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
         const matchAirline = appState.searchSelectedAirlines.length === 0 || appState.searchSelectedAirlines.includes(flight.airlineName);
         return matchDeparture && matchDestination && matchAirline;
     });
@@ -454,7 +463,8 @@ const renderAdminPanel = () => {
  */
 const renderFlightForm = () => {
     const isEditing = !!appState.adminEditingFlight;
-    const flightData = isEditing ? { ...appState.adminEditingFlight } : { // 創建副本以避免直接修改 appState
+    // 創建航班數據的副本，以便在表單中修改時不會直接影響 appState
+    const flightData = isEditing ? { ...appState.adminEditingFlight } : {
         departure: '',
         destination: '',
         flightDuration: '',
@@ -599,7 +609,8 @@ const renderFlightForm = () => {
             departureTime: formDiv.querySelector('#form-departureTime').value,
             arrivalTime: formDiv.querySelector('#form-arrivalTime').value,
             airlineName: formDiv.querySelector('#form-airlineName').value,
-            airlineLogoUrl: isEditing ? appState.adminEditingFlight.airlineLogoUrl : '', // 預設使用現有 URL 或空
+            // 如果沒有新圖片，保留原有的 URL，否則會被上傳邏輯覆蓋
+            airlineLogoUrl: isEditing ? (appState.adminEditingFlight.airlineLogoUrl || '') : '',
             flightNumber: formDiv.querySelector('#form-flightNumber').value,
             aircraftType: formDiv.querySelector('#form-aircraftType').value,
             availableDays: Array.from(formDiv.querySelectorAll('#days-checkboxes input[type="checkbox"]:checked')).map(cb => cb.value),
@@ -675,16 +686,20 @@ const renderApp = () => {
  */
 let unsubscribeFlightsListener = null; // 用於儲存取消訂閱函數
 const setupFlightsListener = () => {
-    // 如果已經有監聽器，則先取消訂閱以避免重複
-    if (unsubscribeFlightsListener) {
-        unsubscribeFlightsListener();
-        unsubscribeFlightsListener = null; // 重設為 null
-    }
-
     // 確保 userId 已有值，因為 Firestore 路徑需要它
     if (!appState.userId) {
-        console.log("等待 userId 確定以建立 Firestore 監聽器。");
+        console.warn("未提供 userId，無法建立 Firestore 監聽器。");
         return;
+    }
+
+    // 如果已經有監聽器且是針對同一個用戶，則無需重新設定
+    // 這裡我們假設每次 userId 變化都會觸發取消訂閱，所以可以直接設定
+    if (unsubscribeFlightsListener) {
+        // 如果此時已經有監聽器，表示在 userId 變更時，前一個沒有被正確取消
+        // 這是為了防止極端情況下的重複監聽，但主要邏輯應確保正確的生命週期管理
+        unsubscribeFlightsListener();
+        unsubscribeFlightsListener = null;
+        console.log("已取消先前的 Firestore 航班數據監聽器。");
     }
 
     const flightsCollectionRef = collection(db, `artifacts/${appId}/public/data/flights`);
@@ -694,63 +709,69 @@ const setupFlightsListener = () => {
     unsubscribeFlightsListener = onSnapshot(q, (snapshot) => {
         const flightsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log("Firestore 數據更新:", flightsData);
-        updateAppStateAndRender({ flights: flightsData }); // 更新狀態並觸發重新渲染
+        // 使用 updateAppStateAndRender 觸發 UI 更新
+        updateAppStateAndRender({ flights: flightsData });
     }, (err) => {
         console.error("監聽航班數據失敗:", err);
         updateAppStateAndRender({ error: "無法載入航班數據。" });
     });
-    console.log("Firestore 航班數據監聽器已啟動。");
+    console.log(`Firestore 航班數據監聽器已啟動 for user: ${appState.userId}`);
 };
 
 
 // 頁面載入完成後執行主邏輯
 window.addEventListener('load', async () => {
-    // 嘗試進行 Firebase 認證 (自訂 token 或匿名)
-    try {
-        if (initialAuthToken) {
-            try {
-                await signInWithCustomToken(auth, initialAuthToken);
-                console.log("使用自訂 token 登入成功。");
-            } catch (customTokenError) {
-                console.warn("自訂 token 登入失敗 (auth/invalid-claims 等錯誤)，嘗試匿名登入:", customTokenError);
-                await signInAnonymously(auth);
-                console.log("匿名登入成功 (fallback)。");
-            }
-        } else {
-            await signInAnonymously(auth);
-            console.log("沒有自訂 token，直接匿名登入。");
-        }
-    } catch (e) {
-        console.error("Firebase認證初始化失敗:", e);
-        updateAppStateAndRender({ error: `Firebase認證初始化失敗: ${e.message}` });
-        return; // 如果初始認證嚴重失敗，則停止執行
-    }
+    // 初始渲染應用程式的外殼，顯示載入中訊息
+    // 這一步很重要，確保用戶在 Firebase 載入期間看到內容
+    renderApp();
+
+    let initialAuthResolved = false; // 標記初始認證是否已處理
+    let previousUserId = null; // 追蹤上一次的 userId
 
     // 監聽 Firebase 認證狀態變化
-    onAuthStateChanged(auth, (user) => {
-        let newUserId = null;
-        if (user) {
-            newUserId = user.uid;
-            console.log("onAuthStateChanged: 用戶已登入:", user.uid);
-        } else {
-            console.log("onAuthStateChanged: 用戶已登出。");
-        }
-        // 更新狀態，包括 currentUser 和 userId，並標記載入完成
-        updateAppStateAndRender({ currentUser: user, userId: newUserId, loading: false });
+    onAuthStateChanged(auth, async (user) => {
+        const currentUserId = user ? user.uid : null;
 
-        // 一旦用戶 ID 確定且應用程式不再載入中，就啟動 Firestore 數據監聽器
-        if (newUserId && !appState.loading) {
-             setupFlightsListener();
-        } else if (!newUserId) {
-            // 如果用戶登出，確保取消 Firestore 監聽
+        // 第一次認證狀態變化時，執行初始登入邏輯
+        if (!initialAuthResolved) {
+            initialAuthResolved = true; // 標記為已處理
+            try {
+                if (initialAuthToken) {
+                    try {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        console.log("使用自訂 token 登入成功。");
+                    } catch (customTokenError) {
+                        console.warn("自訂 token 登入失敗 (auth/invalid-claims 等錯誤)，嘗試匿名登入:", customTokenError);
+                        await signInAnonymously(auth); // 回退到匿名登入
+                        console.log("匿名登入成功 (fallback)。");
+                    }
+                } else {
+                    await signInAnonymously(auth); // 沒有自訂 token，直接匿名登入
+                    console.log("沒有自訂 token，直接匿名登入。");
+                }
+            } catch (e) {
+                console.error("Firebase認證初始化失敗:", e);
+                updateAppStateAndRender({ error: `Firebase認證初始化失敗: ${e.message}`, loading: false });
+                return; // 如果認證嚴重失敗，則停止
+            }
+        }
+
+        // 更新應用程式狀態
+        updateAppStateAndRender({ currentUser: user, userId: currentUserId, loading: false });
+        console.log(`onAuthStateChanged - 用戶ID變更：從 ${previousUserId} 到 ${currentUserId}`);
+
+        // 判斷是否需要設定或取消 Firestore 數據監聽器
+        if (currentUserId && currentUserId !== previousUserId) {
+            // 用戶登入或切換，設定新的監聽器
+            setupFlightsListener();
+        } else if (!currentUserId && previousUserId) {
+            // 用戶登出，取消監聽器
             if (unsubscribeFlightsListener) {
                 unsubscribeFlightsListener();
                 unsubscribeFlightsListener = null;
                 console.log("Firestore 航班數據監聽器已停止。");
             }
         }
+        previousUserId = currentUserId; // 更新 previousUserId 以供下次回調使用
     });
-
-    // 初始渲染應用程式的外殼，顯示載入中訊息
-    renderApp();
 });
