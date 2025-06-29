@@ -8,13 +8,14 @@ const {
 
 // === 在此處填入您的 Firebase 專案設定 ===
 const firebaseConfig = {
-    apiKey: "AIzaSyBdQaCIlSyHKxWv8Gw39chsYe-nVJGxNys",
-    authDomain: "flightsearch-1f322.firebaseapp.com",
-    projectId: "flightsearch-1f322",
-    storageBucket: "flightsearch-1f322.firebasestorage.app",
-    messagingSenderId: "159180948157",
-    appId: "1:159180948157:web:71ccb2de3059ce3a4a6dd4",
-    measurementId: "G-H5NLFFXK9M"
+    apiKey: "AIzaSyCZSC4KP9r9Ia74gjhVM4hkhkCiXU6ltR4",
+    authDomain: "avny-ccbe9.firebaseapp.com",
+    databaseURL: "https://avny-ccbe9-default-rtdb.firebaseio.com",
+    projectId: "avny-ccbe9",
+    storageBucket: "avny-ccbe9.firebasestorage.app",
+    messagingSenderId: "686829295344",
+    appId: "1:686829295344:web:6ac5c87b3d5f1b70701435",
+    measurementId: "G-D2VXHJT2ZX"
 };
 
 // 您可以從 Firebase 設定中找到這個 ID，或者根據您的專案需求自定義
