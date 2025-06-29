@@ -6,9 +6,25 @@ const {
     getStorage, ref, uploadBytes, getDownloadURL
 } = window.firebase;
 
-const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
-const appId = window.__app_id || 'default-app-id';
-const initialAuthToken = window.__initial_auth_token || null;
+// === 在此處填入您的 Firebase 專案設定 ===
+const firebaseConfig = {
+    apiKey: "AIzaSyBdQaCIlSyHKxWv8Gw39chsYe-nVJGxNys",
+    authDomain: "flightsearch-1f322.firebaseapp.com",
+    projectId: "flightsearch-1f322",
+    storageBucket: "flightsearch-1f322.firebasestorage.app",
+    messagingSenderId: "159180948157",
+    appId: "1:159180948157:web:71ccb2de3059ce3a4a6dd4",
+    measurementId: "G-H5NLFFXK9M"
+};
+
+// 您可以從 Firebase 設定中找到這個 ID，或者根據您的專案需求自定義
+const appId = firebaseConfig.appId; // 或者直接定義 'default-app-id';
+
+// 如果您有自訂認證令牌，請在此處填入。如果沒有，請設為 null。
+// 這通常用於伺服器端生成的令牌，用於特定使用者登入。
+const initialAuthToken = null; // 或者 'YOUR_CUSTOM_AUTH_TOKEN_STRING';
+// ===========================================
+
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -653,16 +669,14 @@ window.addEventListener('load', async () => {
             console.log("onAuthStateChanged: 用戶已登出。");
         }
         updateAppStateAndRender({ currentUser: user, userId: newUserId, loading: false });
+        // After auth state is determined and userId is available, set up the flights listener
+        if (newUserId) {
+             setupFlightsListener();
+        }
     });
 
-    // Listen to Flights Collection Changes (only after userId is confirmed and not loading)
-    // This listener is set up within the main render loop's effect to ensure it's re-evaluated
-    // when userId or loading state changes, but should ideally be managed to avoid duplicate listeners.
-    // For this direct DOM manipulation setup, we will ensure it's called once after initial load.
-    // The renderApp will trigger a re-render when appState.flights changes, which is updated by onSnapshot.
-    if (!appState.userId && !appState.loading) { // Initial check if we can already listen
-        setupFlightsListener();
-    }
+    // Initial call to render the app shell while loading
+    renderApp();
 });
 
 // Separate function for setting up the Firestore listener to control its lifecycle
@@ -673,7 +687,7 @@ const setupFlightsListener = () => {
     }
 
     if (!appState.userId) { // Ensure we have a userId before trying to listen
-        console.log("Waiting for userId to establish Firestore listener.");
+        console.log("等待 userId 確定以建立 Firestore 監聽器。");
         return;
     }
 
@@ -689,30 +703,3 @@ const setupFlightsListener = () => {
         updateAppStateAndRender({ error: "無法載入航班數據。" });
     });
 };
-
-// Initial render once all scripts are loaded and Firebase state is being observed
-// The first render will show "載入中..." handled by HTML, then JS takes over.
-// We call renderApp after auth state is determined to show correct content.
-// The onAuthStateChanged listener will call updateAppStateAndRender which triggers renderApp.
-
-// Call setupFlightsListener once after initial load, and it will be re-evaluated
-// when appState.userId changes.
-window.onload = function() {
-    // This ensures that the app doesn't try to render before all Firebase modules are globally available.
-    // The renderApp is called by onAuthStateChanged which covers the initial loading state.
-    // We explicitly call setupFlightsListener once here.
-    if (appState.userId && !appState.loading) { // If auth is already resolved before onload
-        setupFlightsListener();
-    } else {
-        // Fallback for cases where userId might not be immediately available
-        // onAuthStateChanged will eventually call updateAppStateAndRender which re-triggers.
-        // We ensure a listener is set once userId is ready.
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user && !appState.loading) { // Ensure user is available and app is not in initial loading screen
-                setupFlightsListener();
-                unsubscribe(); // Only set up once
-            }
-        });
-    }
-};
-
