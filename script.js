@@ -1,3 +1,11 @@
+
+    apiKey: "AIzaSyCZSC4KP9r9Ia74gjhVM4hkhkCiXU6ltR4",
+    authDomain: "avny-ccbe9.firebaseapp.com",
+    databaseURL: "https://avny-ccbe9-default-rtdb.firebaseio.com",
+    projectId: "avny-ccbe9",
+    storageBucket: "avny-ccbe9.firebasestorage.app",
+    messagingSenderId: "686829295344",
+    appId: "1:686829295344:web:6ac5c87b3d5f1b70701435"
 // Ensure Firebase modules are loaded globally by index.html script type="module"
 const {
     initializeApp,
@@ -402,7 +410,8 @@ const renderFlightResults = (flights) => {
         resultsDiv.className = "text-center text-white text-2xl mt-10 p-6 bg-white bg-opacity-10 rounded-xl shadow-xl";
         resultsDiv.textContent = "沒有找到符合條件的航班。";
     } else {
-        resultsDiv.className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6";
+        // 修改為單欄佈局
+        resultsDiv.className = "grid grid-cols-1 gap-6";
         flights.forEach(flight => {
             resultsDiv.appendChild(renderFlightCard(flight));
         });
@@ -417,7 +426,8 @@ const renderFlightResults = (flights) => {
  */
 const renderFlightCard = (flight) => {
     const cardDiv = document.createElement('div');
-    cardDiv.className = "bg-white p-6 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 flex flex-col justify-between";
+    // 添加 group class for hover effect
+    cardDiv.className = "bg-white p-6 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 flex flex-col justify-between group relative overflow-hidden"; // Added group and relative overflow-hidden
     cardDiv.innerHTML = `
         <div>
             <div class="flex items-center justify-between mb-4">
@@ -447,19 +457,21 @@ const renderFlightCard = (flight) => {
                     </div>
                 </div>
                 
-                <p class="text-lg text-gray-600 mb-2">
-                    飛行時長: <span class="font-semibold">${flight.flightDuration}</span>
-                </p>
-                <p class="text-lg text-gray-600 mb-4">
-                    機型: <span class="font-semibold">${flight.aircraftType}</span>
-                </p>
-            </div>
-        </div>
-
-        <div class="mt-auto pt-4 border-t border-gray-200">
-            <p class="text-sm font-semibold text-blue-900 mb-2">一週飛行日:</p>
-            <div class="flex space-x-2 justify-center">
-                ${formatDays(flight.availableDays || [])}
+                <!-- 這些內容預設隱藏，滑鼠移上時顯示 -->
+                <div class="flight-details-hidden opacity-0 max-h-0 overflow-hidden transition-all duration-500 ease-in-out group-hover:opacity-100 group-hover:max-h-40">
+                    <p class="text-lg text-gray-600 mb-2">
+                        飛行時長: <span class="font-semibold">${flight.flightDuration}</span>
+                    </p>
+                    <p class="text-lg text-gray-600 mb-4">
+                        機型: <span class="font-semibold">${flight.aircraftType}</span>
+                    </p>
+                    <div class="pt-4 border-t border-gray-200">
+                        <p class="text-sm font-semibold text-blue-900 mb-2">一週飛行日:</p>
+                        <div class="flex space-x-2 justify-center">
+                            ${formatDays(flight.availableDays || [])}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     `;
