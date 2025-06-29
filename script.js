@@ -45,6 +45,7 @@ const appState = {
     searchDeparture: '', // 搜尋的出發地機場
     searchDestination: '', // 搜尋的目的地機場
     searchSelectedAirlines: [], // 搜尋選中的航空公司列表
+    hasSearched: false, // 新增狀態：是否已執行過搜尋，控制結果顯示
 
     // 管理表單的狀態
     adminEditingFlight: null, // 正在編輯的航班物件 (如果為 null 則為新增模式)
@@ -207,7 +208,7 @@ const renderHeader = () => {
     `;
 
     // 為導覽按鈕附加事件監聽器
-    header.querySelector('#nav-search').addEventListener('click', () => updateAppStateAndRender({ activeTab: 'search' }));
+    header.querySelector('#nav-search').addEventListener('click', () => updateAppStateAndRender({ activeTab: 'search', hasSearched: false })); // 重設 hasSearched
     if (appState.currentUser) {
         header.querySelector('#nav-admin').addEventListener('click', () => updateAppStateAndRender({ activeTab: 'admin' }));
         header.querySelector('#nav-logout').addEventListener('click', async () => {
@@ -221,7 +222,8 @@ const renderHeader = () => {
                     adminMessage: '',
                     adminImageFile: null,
                     adminPreviewImage: '',
-                    adminCurrentFormValues: {} // 清空表單值
+                    adminCurrentFormValues: {}, // 清空表單值
+                    hasSearched: false // 登出後也重設搜尋狀態
                 });
             } catch (error) {
                 console.error("登出失敗:", error);
@@ -298,22 +300,26 @@ const renderFlightSearch = () => {
                     `).join('')}
                 </div>
             </div>
+            <div class="flex justify-center lg:justify-end items-end">
+                <button id="search-flights-btn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    搜尋航班
+                </button>
+            </div>
         </div>
         <div id="flight-results-container"></div>
     `;
 
-    // 為搜尋欄位附加防抖的事件監聽器
+    // 為搜尋欄位附加事件監聽器，僅更新狀態，不觸發立即渲染
     const departureInput = searchDiv.querySelector('#search-departure');
-    departureInput.addEventListener('input', debounce((e) => {
-        appState.searchDeparture = e.target.value; // 直接更新狀態
-        updateAppStateAndRender({}); // 觸發渲染
-    }, 300)); // 300ms 延遲
+    departureInput.addEventListener('input', (e) => {
+        appState.searchDeparture = e.target.value;
+    });
 
     const destinationInput = searchDiv.querySelector('#search-destination');
-    destinationInput.addEventListener('input', debounce((e) => {
-        appState.searchDestination = e.target.value; // 直接更新狀態
-        updateAppStateAndRender({}); // 觸發渲染
-    }, 300)); // 300ms 延遲
+    destinationInput.addEventListener('input', (e) => {
+        appState.searchDestination = e.target.value;
+    });
 
     searchDiv.querySelector('#airline-checkboxes').addEventListener('change', (e) => {
         if (e.target.type === 'checkbox') {
@@ -324,20 +330,32 @@ const renderFlightSearch = () => {
             } else {
                 newSelectedAirlines = newSelectedAirlines.filter(name => name !== airlineName);
             }
-            updateAppStateAndRender({ searchSelectedAirlines: newSelectedAirlines });
+            appState.searchSelectedAirlines = newSelectedAirlines; // 直接更新狀態，不觸發渲染
         }
     });
 
-    // 根據當前的 appState 進行航班過濾
-    const currentFilteredFlights = appState.flights.filter(flight => {
-        const matchDeparture = appState.searchDeparture === '' || flight.departure.toLowerCase().includes(appState.searchDeparture.toLowerCase());
-        const matchDestination = appState.searchDestination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
-        const matchAirline = appState.searchSelectedAirlines.length === 0 || appState.searchSelectedAirlines.includes(flight.airlineName);
-        return matchDeparture && matchDestination && matchAirline;
+    // 搜尋按鈕的點擊事件，觸發渲染並標記已搜尋
+    searchDiv.querySelector('#search-flights-btn').addEventListener('click', () => {
+        updateAppStateAndRender({ hasSearched: true });
     });
 
-    // 將過濾後的結果渲染到容器中
-    searchDiv.querySelector('#flight-results-container').appendChild(renderFlightResults(currentFilteredFlights));
+    const resultsContainer = searchDiv.querySelector('#flight-results-container');
+    if (appState.hasSearched) {
+        // 根據當前的 appState 進行航班過濾
+        const currentFilteredFlights = appState.flights.filter(flight => {
+            const matchDeparture = appState.searchDeparture === '' || flight.departure.toLowerCase().includes(appState.searchDeparture.toLowerCase());
+            const matchDestination = appState.searchDestination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
+            const matchAirline = appState.searchSelectedAirlines.length === 0 || appState.searchSelectedAirlines.includes(flight.airlineName);
+            return matchDeparture && matchDestination && matchAirline;
+        });
+        resultsContainer.appendChild(renderFlightResults(currentFilteredFlights));
+    } else {
+        // 初始狀態或未搜尋時顯示提示
+        const messageDiv = document.createElement('div');
+        messageDiv.className = "text-center text-white text-2xl mt-10 p-6 bg-white bg-opacity-10 rounded-xl shadow-xl";
+        messageDiv.textContent = "請輸入搜尋條件並點擊搜尋。";
+        resultsContainer.appendChild(messageDiv);
+    }
 
     return searchDiv;
 };
@@ -384,19 +402,22 @@ const renderFlightCard = (flight) => {
             </div>
 
             <div class="text-gray-700 mb-4">
-                <div class="flex items-center justify-between text-xl font-bold text-blue-800 mb-2">
-                    <span>${flight.departure}</span>
-                    <span class="text-gray-500 mx-2 text-base">→</span>
-                    <span>${flight.destination}</span>
+                <div class="flex justify-between items-start text-blue-800 mb-4">
+                    <div class="flex flex-col items-center text-center">
+                        <span class="text-3xl font-bold">${flight.departure}</span>
+                        <span class="text-lg text-gray-600 mt-1">${formatTime(flight.departureTime)}</span>
+                    </div>
+                    <div class="flex flex-col items-center justify-center h-full pt-2">
+                        <span class="text-gray-500 text-base">→</span>
+                    </div>
+                    <div class="flex flex-col items-center text-center">
+                        <span class="text-3xl font-bold">${flight.destination}</span>
+                        <span class="text-lg text-gray-600 mt-1">${formatTime(flight.arrivalTime)}</span>
+                    </div>
                 </div>
+                
                 <p class="text-lg text-gray-600 mb-2">
                     飛行時長: <span class="font-semibold">${flight.flightDuration}</span>
-                </p>
-                <p class="text-lg text-gray-600 mb-2">
-                    起飛時間: <span class="font-semibold">${formatTime(flight.departureTime)}</span>
-                </p>
-                <p class="text-lg text-gray-600 mb-4">
-                    降落時間: <span class="font-semibold">${formatTime(flight.arrivalTime)}</span>
                 </p>
                 <p class="text-lg text-gray-600 mb-4">
                     機型: <span class="font-semibold">${flight.aircraftType}</span>
@@ -602,7 +623,6 @@ const renderFlightForm = () => {
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
             </div>
-            <!-- 飛行時長欄位已移除，將自動計算 -->
 
             <div class="mb-4">
                 <label for="form-airlineName" class="block text-sm font-medium text-gray-700 mb-1">航空公司名稱</label>
