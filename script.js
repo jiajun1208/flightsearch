@@ -50,7 +50,8 @@ const appState = {
     adminShowForm: false, // 是否顯示航班新增/編輯表單
     adminMessage: '', // 管理操作的訊息 (例如: "新增成功")
     adminImageFile: null, // 用於上傳的航空公司 LOGO 檔案
-    adminPreviewImage: '' // 航空公司 LOGO 的預覽 URL
+    adminPreviewImage: '', // 航空公司 LOGO 的預覽 URL
+    adminCurrentFormValues: {}, // 儲存管理表單的即時輸入值
 };
 
 // 航空公司數據列表
@@ -181,7 +182,8 @@ const renderHeader = () => {
                     adminShowForm: false,
                     adminMessage: '',
                     adminImageFile: null,
-                    adminPreviewImage: ''
+                    adminPreviewImage: '',
+                    adminCurrentFormValues: {} // 清空表單值
                 });
             } catch (error) {
                 console.error("登出失敗:", error);
@@ -264,20 +266,18 @@ const renderFlightSearch = () => {
 
     // 為搜尋欄位附加防抖的事件監聽器
     const departureInput = searchDiv.querySelector('#search-departure');
-    const debouncedSetDeparture = debounce((value) => {
-        updateAppStateAndRender({ searchDeparture: value });
-    }, 300); // 300ms 延遲
-    departureInput.addEventListener('input', (e) => {
-        debouncedSetDeparture(e.target.value);
-    });
+    // 在 input 事件中更新 appState.searchDeparture, 並觸發防抖渲染
+    departureInput.addEventListener('input', debounce((e) => {
+        appState.searchDeparture = e.target.value; // 直接更新狀態
+        updateAppStateAndRender({}); // 觸發渲染
+    }, 300)); // 300ms 延遲
 
     const destinationInput = searchDiv.querySelector('#search-destination');
-    const debouncedSetDestination = debounce((value) => {
-        updateAppStateAndRender({ searchDestination: value });
-    }, 300); // 300ms 延遲
-    destinationInput.addEventListener('input', (e) => {
-        debouncedSetDestination(e.target.value);
-    });
+    // 在 input 事件中更新 appState.searchDestination, 並觸發防抖渲染
+    destinationInput.addEventListener('input', debounce((e) => {
+        appState.searchDestination = e.target.value; // 直接更新狀態
+        updateAppStateAndRender({}); // 觸發渲染
+    }, 300)); // 300ms 延遲
 
     searchDiv.querySelector('#airline-checkboxes').addEventListener('change', (e) => {
         if (e.target.type === 'checkbox') {
@@ -460,14 +460,38 @@ const renderAdminPanel = () => {
 
         // 為新增、編輯、刪除按鈕附加事件監聽器
         adminContent.querySelector('#add-flight-btn').addEventListener('click', () => {
-            updateAppStateAndRender({ adminEditingFlight: null, adminShowForm: true, adminImageFile: null, adminPreviewImage: '' });
+            // 新增時初始化空表單
+            updateAppStateAndRender({
+                adminEditingFlight: null,
+                adminShowForm: true,
+                adminImageFile: null,
+                adminPreviewImage: '',
+                adminCurrentFormValues: { // 初始化表單值
+                    departure: '', destination: '', flightDuration: '',
+                    departureTime: '', arrivalTime: '', airlineName: '',
+                    airlineLogoUrl: '', flightNumber: '', aircraftType: '',
+                    availableDays: []
+                }
+            });
         });
 
         adminContent.querySelectorAll('.edit-btn').forEach(button => {
             button.addEventListener('click', () => {
                 const flightId = button.dataset.id;
                 const flightToEdit = appState.flights.find(f => f.id === flightId);
-                updateAppStateAndRender({ adminEditingFlight: flightToEdit, adminShowForm: true, adminImageFile: null, adminPreviewImage: flightToEdit.airlineLogoUrl || '' });
+                // 編輯時載入現有數據
+                updateAppStateAndRender({
+                    adminEditingFlight: flightToEdit,
+                    adminShowForm: true,
+                    adminImageFile: null, // 清除可能的舊檔案，準備上傳新檔案
+                    adminPreviewImage: flightToEdit.airlineLogoUrl || '', // 顯示現有預覽圖
+                    adminCurrentFormValues: { // 載入編輯數據到表單值
+                        ...flightToEdit,
+                        departureTime: get24HourTime(flightToEdit.departureTime), // 轉為 HH:MM
+                        arrivalTime: get24HourTime(flightToEdit.arrivalTime),     // 轉為 HH:MM
+                        availableDays: flightToEdit.availableDays || []
+                    }
+                });
             });
         });
 
@@ -498,52 +522,34 @@ const renderAdminPanel = () => {
  * @returns {HTMLElement} 航班表單 DOM 元素
  */
 const renderFlightForm = () => {
-    const isEditing = !!appState.adminEditingFlight;
-    // 創建航班數據的副本，以便在表單中修改時不會直接影響 appState
-    const flightData = isEditing ? { ...appState.adminEditingFlight } : {
-        departure: '',
-        destination: '',
-        flightDuration: '',
-        departureTime: '',
-        arrivalTime: '',
-        airlineName: '',
-        airlineLogoUrl: '',
-        flightNumber: '',
-        aircraftType: '',
-        availableDays: [],
-    };
-
-    // 處理日期時間格式，以適應 input type="time"
-    // 這裡使用 get24HourTime 確保只取時分
-    const displayDepartureTime = isEditing ? get24HourTime(flightData.departureTime) : '';
-    const displayArrivalTime = isEditing ? get24HourTime(flightData.arrivalTime) : '';
-
+    // 直接從 appState 中讀取表單的即時值
+    const formValues = appState.adminCurrentFormValues;
 
     const formDiv = document.createElement('div');
     formDiv.className = "bg-white p-8 rounded-2xl shadow-xl space-y-6 text-blue-900";
     formDiv.innerHTML = `
-        <h3 class="text-2xl font-bold text-center mb-6">${isEditing ? '編輯航班' : '新增航班'}</h3>
+        <h3 class="text-2xl font-bold text-center mb-6">${appState.adminEditingFlight ? '編輯航班' : '新增航班'}</h3>
 
         <form id="flight-form">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label for="form-departure" class="block text-sm font-medium text-gray-700 mb-1">出發地機場</label>
-                    <input type="text" id="form-departure" name="departure" value="${flightData.departure}" required
+                    <input type="text" id="form-departure" name="departure" value="${formValues.departure || ''}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                     <label for="form-destination" class="block text-sm font-medium text-gray-700 mb-1">目的地機場</label>
-                    <input type="text" id="form-destination" name="destination" value="${flightData.destination}" required
+                    <input type="text" id="form-destination" name="destination" value="${formValues.destination || ''}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                     <label for="form-flightNumber" class="block text-sm font-medium text-gray-700 mb-1">航班編號</label>
-                    <input type="text" id="form-flightNumber" name="flightNumber" value="${flightData.flightNumber}" required
+                    <input type="text" id="form-flightNumber" name="flightNumber" value="${formValues.flightNumber || ''}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                     <label for="form-aircraftType" class="block text-sm font-medium text-gray-700 mb-1">飛機機型</label>
-                    <input type="text" id="form-aircraftType" name="aircraftType" value="${flightData.aircraftType}" required
+                    <input type="text" id="form-aircraftType" name="aircraftType" value="${formValues.aircraftType || ''}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
             </div>
@@ -551,24 +557,24 @@ const renderFlightForm = () => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                     <label for="form-departureTime" class="block text-sm font-medium text-gray-700 mb-1">起飛時間 (僅時分)</label>
-                    <input type="time" id="form-departureTime" name="departureTime" value="${displayDepartureTime}" required
+                    <input type="time" id="form-departureTime" name="departureTime" value="${formValues.departureTime || ''}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                     <label for="form-arrivalTime" class="block text-sm font-medium text-gray-700 mb-1">降落時間 (僅時分)</label>
-                    <input type="time" id="form-arrivalTime" name="arrivalTime" value="${displayArrivalTime}" required
+                    <input type="time" id="form-arrivalTime" name="arrivalTime" value="${formValues.arrivalTime || ''}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                     <label for="form-flightDuration" class="block text-sm font-medium text-gray-700 mb-1">飛行時長 (例如: 2h30m)</label>
-                    <input type="text" id="form-flightDuration" name="flightDuration" value="${flightData.flightDuration}" required
+                    <input type="text" id="form-flightDuration" name="flightDuration" value="${formValues.flightDuration || ''}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
             </div>
 
             <div class="mb-4">
                 <label for="form-airlineName" class="block text-sm font-medium text-gray-700 mb-1">航空公司名稱</label>
-                <input type="text" id="form-airlineName" name="airlineName" value="${flightData.airlineName}" required
+                <input type="text" id="form-airlineName" name="airlineName" value="${formValues.airlineName || ''}" required
                     class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
@@ -582,6 +588,8 @@ const renderFlightForm = () => {
                         <img src="${appState.adminPreviewImage}" alt="Logo Preview" class="w-20 h-20 object-contain rounded-lg border border-gray-300 shadow-sm" />
                     ` : ''}
                 </div>
+                ${appState.adminImageFile ? '<p class="text-sm text-blue-600 mt-2">已選擇檔案: ' + appState.adminImageFile.name + '</p>' : ''}
+                <p class="text-sm text-gray-500 mt-2">注意: 上傳圖片後，文件選擇框可能會顯示"未選擇任何檔案"，但圖片已成功載入預覽。</p>
             </div>
 
             <div class="mb-6">
@@ -591,7 +599,7 @@ const renderFlightForm = () => {
                         <label class="inline-flex items-center text-gray-800 cursor-pointer">
                             <input type="checkbox" value="${day}"
                                 class="form-checkbox h-5 w-5 text-blue-600 rounded-md focus:ring-blue-500"
-                                ${flightData.availableDays.includes(day) ? 'checked' : ''} />
+                                ${formValues.availableDays.includes(day) ? 'checked' : ''} />
                             <span class="ml-2 text-base">${{ Mon: '星期一', Tue: '星期二', Wed: '星期三', Thu: '星期四', Fri: '星期五', Sat: '星期六', Sun: '星期日' }[day]}</span>
                         </label>
                     `).join('')}
@@ -605,7 +613,7 @@ const renderFlightForm = () => {
                 </button>
                 <button type="submit"
                     class="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    ${isEditing ? '儲存變更' : '新增航班'}
+                    ${appState.adminEditingFlight ? '儲存變更' : '新增航班'}
                 </button>
             </div>
         </form>
@@ -614,19 +622,43 @@ const renderFlightForm = () => {
     const formElement = formDiv.querySelector('#flight-form');
     const imageInput = formDiv.querySelector('#form-airlineLogo');
 
-    // 為圖片輸入框附加事件監聽器，處理圖片預覽
+    // 為所有輸入欄位附加事件監聽器，更新 appState.adminCurrentFormValues
+    // 這裡不觸發 updateAppStateAndRender，以避免表單重新繪製
+    formElement.querySelectorAll('input:not([type="checkbox"]):not([type="file"]), select, textarea').forEach(input => {
+        input.addEventListener('input', (e) => {
+            appState.adminCurrentFormValues[e.target.name] = e.target.value;
+        });
+    });
+
+    // 為日期選擇框單獨處理，因為它們沒有 name 屬性，且需要處理 checked 狀態
+    formDiv.querySelector('#days-checkboxes').addEventListener('change', (e) => {
+        if (e.target.type === 'checkbox') {
+            const dayValue = e.target.value;
+            let newDays = [...(appState.adminCurrentFormValues.availableDays || [])];
+            if (e.target.checked) {
+                newDays.push(dayValue);
+            } else {
+                newDays = newDays.filter(day => day !== dayValue);
+            }
+            appState.adminCurrentFormValues.availableDays = newDays;
+        }
+    });
+
+
+    // 為圖片輸入框附加事件監聽器，處理圖片預覽（這裡需要觸發重新渲染來更新預覽圖）
     imageInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             appState.adminImageFile = file; // 將檔案儲存到狀態中
             const reader = new FileReader();
             reader.onload = (e) => {
-                updateAppStateAndRender({ adminPreviewImage: e.target.result }); // 更新預覽圖片 URL
+                updateAppStateAndRender({ adminPreviewImage: e.target.result }); // 更新預覽圖片 URL 並觸發渲染
             };
             reader.readAsDataURL(file);
         } else {
             appState.adminImageFile = null;
-            updateAppStateAndRender({ adminPreviewImage: isEditing ? flightData.airlineLogoUrl : '' }); // 如果沒有新檔案，恢復原來的或清空
+            // 如果沒有選擇新檔案，且是在編輯模式，則恢復舊的預覽圖；否則清空
+            updateAppStateAndRender({ adminPreviewImage: appState.adminEditingFlight ? (appState.adminEditingFlight.airlineLogoUrl || '') : '' });
         }
     });
 
@@ -635,26 +667,16 @@ const renderFlightForm = () => {
         e.preventDefault();
         updateAppStateAndRender({ adminMessage: '' }); // 清除之前的訊息
 
-        // 從表單獲取當前數據
-        const currentFormData = {
-            departure: formDiv.querySelector('#form-departure').value,
-            destination: formDiv.querySelector('#form-destination').value,
-            flightDuration: formDiv.querySelector('#form-flightDuration').value,
-            airlineName: formDiv.querySelector('#form-airlineName').value,
-            // 如果沒有新圖片，保留原有的 URL，否則會被上傳邏輯覆蓋
-            airlineLogoUrl: isEditing ? (appState.adminEditingFlight.airlineLogoUrl || '') : '',
-            flightNumber: formDiv.querySelector('#form-flightNumber').value,
-            aircraftType: formDiv.querySelector('#form-aircraftType').value,
-            availableDays: Array.from(formDiv.querySelectorAll('#days-checkboxes input[type="checkbox"]:checked')).map(cb => cb.value),
-        };
+        // 提交時，從 appState.adminCurrentFormValues 獲取數據
+        const currentFormData = { ...appState.adminCurrentFormValues }; // 複製一份確保提交的是當前狀態的數據
 
         // 獲取時分值，並結合一個固定的日期轉換為 ISO 格式儲存
-        const departureTimeInput = formDiv.querySelector('#form-departureTime').value; // "HH:MM"
-        const arrivalTimeInput = formDiv.querySelector('#form-arrivalTime').value;     // "HH:MM"
-        const dummyDate = '2000-01-01'; // 使用固定日期，因為我們只關心時間部分
         // 檢查時間輸入是否為空，避免創建無效日期
-        currentFormData.departureTime = departureTimeInput ? new Date(`${dummyDate}T${departureTimeInput}:00`).toISOString() : '';
-        currentFormData.arrivalTime = arrivalTimeInput ? new Date(`${dummyDate}T${arrivalTimeInput}:00`).toISOString() : '';
+        currentFormData.departureTime = currentFormData.departureTime ? new Date(`2000-01-01T${currentFormData.departureTime}:00`).toISOString() : '';
+        currentFormData.arrivalTime = currentFormData.arrivalTime ? new Date(`2000-01-01T${currentFormData.arrivalTime}:00`).toISOString() : '';
+
+        // 保留現有的 airlineLogoUrl，除非有新檔案上傳
+        currentFormData.airlineLogoUrl = appState.adminEditingFlight ? (appState.adminEditingFlight.airlineLogoUrl || '') : '';
 
 
         try {
@@ -667,12 +689,12 @@ const renderFlightForm = () => {
             }
 
             // 執行 Firestore 操作 (更新或新增)
-            if (isEditing) {
+            if (appState.adminEditingFlight) {
                 await updateDoc(doc(db, `artifacts/${appId}/public/data/flights`, appState.adminEditingFlight.id), currentFormData);
-                updateAppStateAndRender({ adminMessage: '航班已成功更新！', adminShowForm: false, adminEditingFlight: null, adminImageFile: null, adminPreviewImage: '' });
+                updateAppStateAndRender({ adminMessage: '航班已成功更新！', adminShowForm: false, adminEditingFlight: null, adminImageFile: null, adminPreviewImage: '', adminCurrentFormValues: {} });
             } else {
                 await addDoc(collection(db, `artifacts/${appId}/public/data/flights`), currentFormData);
-                updateAppStateAndRender({ adminMessage: '航班已成功新增！', adminShowForm: false, adminEditingFlight: null, adminImageFile: null, adminPreviewImage: '' });
+                updateAppStateAndRender({ adminMessage: '航班已成功新增！', adminShowForm: false, adminEditingFlight: null, adminImageFile: null, adminPreviewImage: '', adminCurrentFormValues: {} });
             }
         } catch (e) {
             console.error("操作航班失敗:", e);
@@ -683,7 +705,7 @@ const renderFlightForm = () => {
 
     // 為取消按鈕附加事件監聽器
     formDiv.querySelector('#form-cancel-btn').addEventListener('click', () => {
-        updateAppStateAndRender({ adminShowForm: false, adminEditingFlight: null, adminImageFile: null, adminPreviewImage: '' });
+        updateAppStateAndRender({ adminShowForm: false, adminEditingFlight: null, adminImageFile: null, adminPreviewImage: '', adminCurrentFormValues: {} });
     });
 
     return formDiv;
