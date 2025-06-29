@@ -3,37 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>七岩維出境航班查詢網</title>
-    <!-- Favicon - 網站圖示 (已新增) -->
-    <link rel="icon" href="https://placehold.co/32x32/0A1931/FFFFFF?text=F" type="image/png">
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Custom Styles -->
-    <link rel="stylesheet" href="style.css">
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>七岩維出境航班查詢網 SEVEN-BAN FLIGHTS</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            /* 深藍色高級絨毛感背景 */
+            background: radial-gradient(circle at top left, #3f51b5 0%, #2196f3 50%, #1a237e 100%);
+            background-color: #1a237e; /* Fallback for older browsers */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #app {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-blue-900 to-blue-700 min-h-screen flex flex-col">
-    <div id="app" class="flex flex-col flex-grow">
-        <!-- Content will be rendered here by script.js -->
-        <div class="min-h-screen flex items-center justify-center text-white text-2xl">
-            載入中...
-        </div>
+<body>
+    <div id="app">
+        <!-- 應用程式內容將由 JavaScript 動態載入 -->
     </div>
 
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDK (v11.6.1) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-
-        // Expose Firebase modules to the global scope for script.js
+        import { 
+            getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signOut 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, where 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { 
+            getStorage, ref, uploadBytes, getDownloadURL 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        
+        // 確保這些 Firebase 模組在 window 對象上可用
         window.firebase = {
             initializeApp,
             getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signOut,
@@ -41,7 +49,7 @@
             getStorage, ref, uploadBytes, getDownloadURL
         };
     </script>
-    <!-- Main Application Script -->
-    <script src="script.js" defer></script>
+    <!-- 主要應用程式邏輯 -->
+    <script type="module" src="script.js"></script>
 </body>
 </html>
