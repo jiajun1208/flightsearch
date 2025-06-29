@@ -1,11 +1,3 @@
-
-    apiKey: "AIzaSyCZSC4KP9r9Ia74gjhVM4hkhkCiXU6ltR4",
-    authDomain: "avny-ccbe9.firebaseapp.com",
-    databaseURL: "https://avny-ccbe9-default-rtdb.firebaseio.com",
-    projectId: "avny-ccbe9",
-    storageBucket: "avny-ccbe9.firebasestorage.app",
-    messagingSenderId: "686829295344",
-    appId: "1:686829295344:web:6ac5c87b3d5f1b70701435"
 // Ensure Firebase modules are loaded globally by index.html script type="module"
 const {
     initializeApp,
