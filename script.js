@@ -15,44 +15,45 @@ const firebaseConfig = {
     storageBucket: "avny-ccbe9.firebasestorage.app",
     messagingSenderId: "686829295344",
     appId: "1:686829295344:web:6ac5c87b3d5f1b70701435",
-    measurementId: "G-D2VXHJT2ZX"
+    // measurementId: "YOUR_MEASUREMENT_ID" // 如果有啟用 Google Analytics，請取消註解並填入
 };
 
-// 您可以從 Firebase 設定中找到這個 ID，或者根據您的專案需求自定義
-const appId = firebaseConfig.appId; // 或者直接定義 'default-app-id';
+// 從 firebaseConfig 中獲取 appId
+const appId = firebaseConfig.appId;
 
 // 如果您有自訂認證令牌，請在此處填入。如果沒有，請設為 null。
-// 這通常用於伺服器端生成的令牌，用於特定使用者登入。
 const initialAuthToken = null; // 或者 'YOUR_CUSTOM_AUTH_TOKEN_STRING';
 // ===========================================
 
-
-// Initialize Firebase
+// 初始化 Firebase 服務
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 
-// Global application state
+// 全局應用程式狀態物件
 const appState = {
-    activeTab: 'search', // 'search' or 'admin'
-    currentUser: null,
-    flights: [],
-    loading: true,
-    error: null,
-    userId: null,
-    // Search form state
-    searchDeparture: '',
-    searchDestination: '',
-    searchSelectedAirlines: [],
-    filteredFlights: [],
-    // Admin form state
-    adminEditingFlight: null,
-    adminShowForm: false,
-    adminMessage: ''
+    activeTab: 'search', // 當前活躍的頁籤: 'search' (航班搜尋) 或 'admin' (管理後台)
+    currentUser: null, // 當前登入的用戶物件 (Firebase User)
+    flights: [], // 從 Firestore 獲取的全部航班資料
+    loading: true, // 應用程式是否正在載入中
+    error: null, // 應用程式是否有錯誤訊息
+    userId: null, // 當前用戶的 Firebase UID (用於 Firestore 路徑)
+
+    // 搜尋表單的狀態
+    searchDeparture: '', // 搜尋的出發地機場
+    searchDestination: '', // 搜尋的目的地機場
+    searchSelectedAirlines: [], // 搜尋選中的航空公司列表
+
+    // 管理表單的狀態
+    adminEditingFlight: null, // 正在編輯的航班物件 (如果為 null 則為新增模式)
+    adminShowForm: false, // 是否顯示航班新增/編輯表單
+    adminMessage: '', // 管理操作的訊息 (例如: "新增成功")
+    adminImageFile: null, // 用於上傳的航空公司 LOGO 檔案
+    adminPreviewImage: '' // 航空公司 LOGO 的預覽 URL
 };
 
-// Updated Airline Data
+// 航空公司數據列表
 const AIRLINES = [
     { name: '七岩維國家航空', id: 'QYWA' },
     { name: '南省航空', id: 'NSH' },
@@ -61,12 +62,23 @@ const AIRLINES = [
     { name: '東森快運航空', id: 'ETEX' },
 ];
 
-// Utility Functions
+// --- 工具函數 ---
+
+/**
+ * 將 ISO 8601 時間字串格式化為本地時間 (例如: 10:00)
+ * @param {string} isoString - ISO 8601 時間字串
+ * @returns {string} 格式化後的時間字串
+ */
 const formatTime = (isoString) => {
     const date = new Date(isoString);
     return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
 };
 
+/**
+ * 格式化航班的可用飛行日期 (例如: "一 二 三")
+ * @param {string[]} daysArray - 包含星期幾縮寫 (Mon, Tue...) 的陣列
+ * @returns {string} 渲染成 HTML 標籤的星期幾字串
+ */
 const formatDays = (daysArray) => {
     const dayMap = {
         "Mon": "一", "Tue": "二", "Wed": "三", "Thu": "四",
@@ -81,13 +93,21 @@ const formatDays = (daysArray) => {
     `).join('');
 };
 
+/**
+ * 更新應用程式狀態並觸發重新渲染
+ * @param {object} newState - 要更新的 appState 部分
+ */
 const updateAppStateAndRender = (newState) => {
     Object.assign(appState, newState);
-    renderApp();
+    renderApp(); // 每次狀態改變時呼叫主渲染函數
 };
 
-// --- Rendering Functions ---
+// --- 渲染函數 ---
 
+/**
+ * 渲染網站的頁首導覽列
+ * @returns {HTMLElement} 頁首 DOM 元素
+ */
 const renderHeader = () => {
     const header = document.createElement('header');
     header.className = "bg-blue-950 shadow-lg p-4 flex justify-between items-center rounded-b-lg";
@@ -118,7 +138,7 @@ const renderHeader = () => {
         </nav>
     `;
 
-    // Attach event listeners
+    // 為導覽按鈕附加事件監聽器
     header.querySelector('#nav-search').addEventListener('click', () => updateAppStateAndRender({ activeTab: 'search' }));
     if (appState.currentUser) {
         header.querySelector('#nav-admin').addEventListener('click', () => updateAppStateAndRender({ activeTab: 'admin' }));
@@ -128,7 +148,7 @@ const renderHeader = () => {
                 updateAppStateAndRender({ activeTab: 'search' }); // 登出後回到搜尋頁面
             } catch (error) {
                 console.error("登出失敗:", error);
-                // In a real app, use a custom modal instead of alert
+                // 實際應用中請使用自定義模態框替代 alert
                 alert("登出失敗，請重試。");
             }
         });
@@ -138,6 +158,10 @@ const renderHeader = () => {
     return header;
 };
 
+/**
+ * 渲染管理員登入表單（此範例僅作佔位符，主要透過匿名登入）
+ * @returns {HTMLElement} 登入表單 DOM 元素
+ */
 const renderAuth = () => {
     const authDiv = document.createElement('div');
     authDiv.className = "flex flex-col items-center justify-center p-6 bg-white bg-opacity-10 rounded-xl shadow-2xl max-w-md mx-auto mt-10";
@@ -160,19 +184,16 @@ const renderAuth = () => {
         e.preventDefault();
         const messageEl = authDiv.querySelector('#auth-message');
         messageEl.textContent = '';
-        try {
-            // This example uses anonymous login for simplicity.
-            // For actual admin login, you'd use signInWithEmailAndPassword here.
-            // For now, this just displays a message.
-            messageEl.textContent = '此範例使用匿名登入。若需管理員功能，請確保使用登入用戶權限。';
-        } catch (error) {
-            console.error("登入錯誤:", error);
-            messageEl.textContent = `登入失敗: ${error.message}`;
-        }
+        // 由於我們預設使用匿名登入，這裡的登入按鈕僅作示範和提示
+        messageEl.textContent = '此範例使用匿名登入。管理員功能應透過 Firestore 權限規則控制。';
     });
     return authDiv;
 };
 
+/**
+ * 渲染航班搜尋介面
+ * @returns {HTMLElement} 航班搜尋 DOM 元素
+ */
 const renderFlightSearch = () => {
     const searchDiv = document.createElement('div');
     searchDiv.className = "p-6";
@@ -204,14 +225,11 @@ const renderFlightSearch = () => {
         <div id="flight-results-container"></div>
     `;
 
-    // Attach event listeners
-    const departureInput = searchDiv.querySelector('#search-departure');
-    departureInput.addEventListener('input', (e) => {
+    // 為搜尋欄位附加事件監聽器，當值改變時更新 appState 並觸發重新渲染
+    searchDiv.querySelector('#search-departure').addEventListener('input', (e) => {
         updateAppStateAndRender({ searchDeparture: e.target.value });
     });
-
-    const destinationInput = searchDiv.querySelector('#search-destination');
-    destinationInput.addEventListener('input', (e) => {
+    searchDiv.querySelector('#search-destination').addEventListener('input', (e) => {
         updateAppStateAndRender({ searchDestination: e.target.value });
     });
 
@@ -228,21 +246,26 @@ const renderFlightSearch = () => {
         }
     });
 
-    // Filter flights based on current state
-    let currentFiltered = appState.flights.filter(flight => {
+    // 根據當前的 appState 進行航班過濾
+    // 注意：這裡直接計算並將結果傳遞給 renderFlightResults，不觸發額外渲染
+    const currentFilteredFlights = appState.flights.filter(flight => {
         const matchDeparture = appState.searchDeparture === '' || flight.departure.toLowerCase().includes(appState.searchDeparture.toLowerCase());
-        const matchDestination = appState.searchDestination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
+        const matchDestination = appState.destination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
         const matchAirline = appState.searchSelectedAirlines.length === 0 || appState.searchSelectedAirlines.includes(flight.airlineName);
         return matchDeparture && matchDestination && matchAirline;
     });
-    updateAppStateAndRender({ filteredFlights: currentFiltered }); // Update appState and re-render
 
-    const resultsContainer = searchDiv.querySelector('#flight-results-container');
-    resultsContainer.appendChild(renderFlightResults(currentFiltered));
+    // 將過濾後的結果渲染到容器中
+    searchDiv.querySelector('#flight-results-container').appendChild(renderFlightResults(currentFilteredFlights));
 
     return searchDiv;
 };
 
+/**
+ * 渲染航班搜尋結果列表
+ * @param {object[]} flights - 要顯示的航班陣列
+ * @returns {HTMLElement} 航班結果列表 DOM 元素
+ */
 const renderFlightResults = (flights) => {
     const resultsDiv = document.createElement('div');
     if (flights.length === 0) {
@@ -257,6 +280,11 @@ const renderFlightResults = (flights) => {
     return resultsDiv;
 };
 
+/**
+ * 渲染單一航班卡片
+ * @param {object} flight - 航班數據物件
+ * @returns {HTMLElement} 航班卡片 DOM 元素
+ */
 const renderFlightCard = (flight) => {
     const cardDiv = document.createElement('div');
     cardDiv.className = "bg-white p-6 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 flex flex-col justify-between";
@@ -305,6 +333,10 @@ const renderFlightCard = (flight) => {
     return cardDiv;
 };
 
+/**
+ * 渲染管理面板 (顯示航班列表、新增/編輯/刪除按鈕)
+ * @returns {HTMLElement} 管理面板 DOM 元素
+ */
 const renderAdminPanel = () => {
     const adminDiv = document.createElement('div');
     adminDiv.className = "p-6 bg-white bg-opacity-10 rounded-xl shadow-2xl mx-auto max-w-6xl";
@@ -321,16 +353,15 @@ const renderAdminPanel = () => {
                 ${appState.adminMessage}
             </div>
         `;
-        // Clear message after a few seconds
+        // 清除訊息，避免長時間顯示
         setTimeout(() => updateAppStateAndRender({ adminMessage: '' }), 5000);
     } else {
         messageContainer.innerHTML = '';
     }
 
-
     const adminContent = adminDiv.querySelector('#admin-content');
 
-    if (!appState.adminShowForm) {
+    if (!appState.adminShowForm) { // 顯示航班列表和新增按鈕
         adminContent.innerHTML = `
             <button id="add-flight-btn"
                 class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg mb-6 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400">
@@ -382,23 +413,23 @@ const renderAdminPanel = () => {
             </div>
         `;
 
-        // Attach event listeners for Add/Edit/Delete buttons
+        // 為新增、編輯、刪除按鈕附加事件監聽器
         adminContent.querySelector('#add-flight-btn').addEventListener('click', () => {
-            updateAppStateAndRender({ adminEditingFlight: null, adminShowForm: true });
+            updateAppStateAndRender({ adminEditingFlight: null, adminShowForm: true, adminImageFile: null, adminPreviewImage: '' });
         });
 
         adminContent.querySelectorAll('.edit-btn').forEach(button => {
             button.addEventListener('click', () => {
                 const flightId = button.dataset.id;
                 const flightToEdit = appState.flights.find(f => f.id === flightId);
-                updateAppStateAndRender({ adminEditingFlight: flightToEdit, adminShowForm: true });
+                updateAppStateAndRender({ adminEditingFlight: flightToEdit, adminShowForm: true, adminImageFile: null, adminPreviewImage: flightToEdit.airlineLogoUrl || '' });
             });
         });
 
         adminContent.querySelectorAll('.delete-btn').forEach(button => {
             button.addEventListener('click', async () => {
                 const flightId = button.dataset.id;
-                // Using window.confirm here; replace with custom modal in production
+                // 實際應用中請使用自定義模態框替代 window.confirm
                 if (confirm("確定要刪除這個航班嗎？")) {
                     try {
                         await deleteDoc(doc(db, `artifacts/${appId}/public/data/flights`, flightId));
@@ -411,15 +442,19 @@ const renderAdminPanel = () => {
             });
         });
 
-    } else {
+    } else { // 顯示航班新增/編輯表單
         adminContent.appendChild(renderFlightForm());
     }
     return adminDiv;
 };
 
+/**
+ * 渲染航班新增/編輯表單
+ * @returns {HTMLElement} 航班表單 DOM 元素
+ */
 const renderFlightForm = () => {
     const isEditing = !!appState.adminEditingFlight;
-    const flightData = isEditing ? appState.adminEditingFlight : {
+    const flightData = isEditing ? { ...appState.adminEditingFlight } : { // 創建副本以避免直接修改 appState
         departure: '',
         destination: '',
         flightDuration: '',
@@ -431,6 +466,14 @@ const renderFlightForm = () => {
         aircraftType: '',
         availableDays: [],
     };
+
+    // 處理日期時間格式，以適應 input type="datetime-local"
+    if (flightData.departureTime) {
+        flightData.departureTime = new Date(flightData.departureTime).toISOString().substring(0, 16);
+    }
+    if (flightData.arrivalTime) {
+        flightData.arrivalTime = new Date(flightData.arrivalTime).toISOString().substring(0, 16);
+    }
 
     const formDiv = document.createElement('div');
     formDiv.className = "bg-white p-8 rounded-2xl shadow-xl space-y-6 text-blue-900";
@@ -464,12 +507,12 @@ const renderFlightForm = () => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                     <label for="form-departureTime" class="block text-sm font-medium text-gray-700 mb-1">起飛時間</label>
-                    <input type="datetime-local" id="form-departureTime" name="departureTime" value="${flightData.departureTime ? new Date(flightData.departureTime).toISOString().substring(0, 16) : ''}" required
+                    <input type="datetime-local" id="form-departureTime" name="departureTime" value="${flightData.departureTime}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                     <label for="form-arrivalTime" class="block text-sm font-medium text-gray-700 mb-1">降落時間</label>
-                    <input type="datetime-local" id="form-arrivalTime" name="arrivalTime" value="${flightData.arrivalTime ? new Date(flightData.arrivalTime).toISOString().substring(0, 16) : ''}" required
+                    <input type="datetime-local" id="form-arrivalTime" name="arrivalTime" value="${flightData.arrivalTime}" required
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
@@ -490,9 +533,9 @@ const renderFlightForm = () => {
                 <input type="file" id="form-airlineLogo" name="airlineLogo" accept=".png,.jpg,.jpeg"
                     class="w-full p-3 border border-blue-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 <div id="logo-preview-container" class="mt-4 flex items-center space-x-3">
-                    ${(flightData.airlineLogoUrl || appState.adminPreviewImage) ? `
+                    ${(appState.adminPreviewImage) ? `
                         <p class="text-gray-600">當前 LOGO 預覽:</p>
-                        <img src="${appState.adminPreviewImage || flightData.airlineLogoUrl}" alt="Logo Preview" class="w-20 h-20 object-contain rounded-lg border border-gray-300 shadow-sm" />
+                        <img src="${appState.adminPreviewImage}" alt="Logo Preview" class="w-20 h-20 object-contain rounded-lg border border-gray-300 shadow-sm" />
                     ` : ''}
                 </div>
             </div>
@@ -526,45 +569,29 @@ const renderFlightForm = () => {
 
     const formElement = formDiv.querySelector('#flight-form');
     const imageInput = formDiv.querySelector('#form-airlineLogo');
-    const logoPreviewContainer = formDiv.querySelector('#logo-preview-container');
 
-    // Attach event listeners for form inputs and changes
-    formElement.addEventListener('change', (e) => {
-        const { name, value, type, checked } = e.target;
-        if (type === 'checkbox' && name === undefined) { // Checkboxes for days don't have a name attribute
-            const dayValue = e.target.value;
-            let newDays = [...(flightData.availableDays || [])];
-            if (checked) {
-                newDays.push(dayValue);
-            } else {
-                newDays = newDays.filter(day => day !== dayValue);
-            }
-            flightData.availableDays = newDays; // Update local flightData directly for form
-        } else if (name) {
-            flightData[name] = value; // Update local flightData
-        }
-    });
-
+    // 為圖片輸入框附加事件監聽器，處理圖片預覽
     imageInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            appState.adminImageFile = file; // Store file globally
+            appState.adminImageFile = file; // 將檔案儲存到狀態中
             const reader = new FileReader();
             reader.onload = (e) => {
-                updateAppStateAndRender({ adminPreviewImage: e.target.result }); // Update preview image
+                updateAppStateAndRender({ adminPreviewImage: e.target.result }); // 更新預覽圖片 URL
             };
             reader.readAsDataURL(file);
         } else {
             appState.adminImageFile = null;
-            updateAppStateAndRender({ adminPreviewImage: flightData.airlineLogoUrl || '' });
+            updateAppStateAndRender({ adminPreviewImage: isEditing ? flightData.airlineLogoUrl : '' }); // 如果沒有新檔案，恢復原來的或清空
         }
     });
 
-
+    // 為表單提交附加事件監聽器
     formElement.addEventListener('submit', async (e) => {
         e.preventDefault();
-        updateAppStateAndRender({ adminMessage: '' }); // Clear previous message
+        updateAppStateAndRender({ adminMessage: '' }); // 清除之前的訊息
 
+        // 從表單獲取當前數據
         const currentFormData = {
             departure: formDiv.querySelector('#form-departure').value,
             destination: formDiv.querySelector('#form-destination').value,
@@ -572,22 +599,22 @@ const renderFlightForm = () => {
             departureTime: formDiv.querySelector('#form-departureTime').value,
             arrivalTime: formDiv.querySelector('#form-arrivalTime').value,
             airlineName: formDiv.querySelector('#form-airlineName').value,
-            airlineLogoUrl: flightData.airlineLogoUrl, // Keep existing URL unless new image uploaded
+            airlineLogoUrl: isEditing ? appState.adminEditingFlight.airlineLogoUrl : '', // 預設使用現有 URL 或空
             flightNumber: formDiv.querySelector('#form-flightNumber').value,
             aircraftType: formDiv.querySelector('#form-aircraftType').value,
             availableDays: Array.from(formDiv.querySelectorAll('#days-checkboxes input[type="checkbox"]:checked')).map(cb => cb.value),
         };
 
         try {
-            let logoUrl = currentFormData.airlineLogoUrl;
+            // 如果有新圖片檔案，則上傳並獲取 URL
             if (appState.adminImageFile) {
                 const storageRef = ref(storage, `airline_logos/${appState.adminImageFile.name}_${Date.now()}`);
                 await uploadBytes(storageRef, appState.adminImageFile);
-                logoUrl = await getDownloadURL(storageRef);
-                console.log("LOGO已上傳:", logoUrl);
+                currentFormData.airlineLogoUrl = await getDownloadURL(storageRef);
+                console.log("LOGO已上傳:", currentFormData.airlineLogoUrl);
             }
-            currentFormData.airlineLogoUrl = logoUrl; // Update with new URL or retain old
 
+            // 執行 Firestore 操作 (更新或新增)
             if (isEditing) {
                 await updateDoc(doc(db, `artifacts/${appId}/public/data/flights`, appState.adminEditingFlight.id), currentFormData);
                 updateAppStateAndRender({ adminMessage: '航班已成功更新！', adminShowForm: false, adminEditingFlight: null, adminImageFile: null, adminPreviewImage: '' });
@@ -601,6 +628,7 @@ const renderFlightForm = () => {
         }
     });
 
+    // 為取消按鈕附加事件監聽器
     formDiv.querySelector('#form-cancel-btn').addEventListener('click', () => {
         updateAppStateAndRender({ adminShowForm: false, adminEditingFlight: null, adminImageFile: null, adminPreviewImage: '' });
     });
@@ -608,17 +636,20 @@ const renderFlightForm = () => {
     return formDiv;
 };
 
-// Main rendering function
+/**
+ * 主要渲染函數：根據 appState 渲染整個應用程式 UI
+ */
 const renderApp = () => {
     const appContainer = document.getElementById('app');
-    appContainer.innerHTML = ''; // Clear existing content
+    appContainer.innerHTML = ''; // 清除現有內容
 
-    // Render Header
+    // 渲染頁首
     appContainer.appendChild(renderHeader());
 
     const mainContent = document.createElement('main');
     mainContent.className = "flex-grow p-6";
 
+    // 根據 activeTab 渲染主要內容區域
     if (appState.activeTab === 'search') {
         mainContent.appendChild(renderFlightSearch());
     } else if (appState.activeTab === 'admin') {
@@ -630,16 +661,51 @@ const renderApp = () => {
     }
     appContainer.appendChild(mainContent);
 
-    // Render Footer
+    // 渲染底部用戶 ID 資訊
     const footer = document.createElement('footer');
     footer.className = "w-full bg-blue-950 text-white text-xs p-2 text-center shadow-inner mt-auto";
     footer.innerHTML = `當前用戶ID: ${appState.userId || '未登入'}`;
     appContainer.appendChild(footer);
 };
 
-// --- Firebase Initialization and Listeners ---
+// --- Firebase 初始化與監聽器 ---
+
+/**
+ * 設定 Firestore 航班數據的即時監聽器
+ */
+let unsubscribeFlightsListener = null; // 用於儲存取消訂閱函數
+const setupFlightsListener = () => {
+    // 如果已經有監聽器，則先取消訂閱以避免重複
+    if (unsubscribeFlightsListener) {
+        unsubscribeFlightsListener();
+        unsubscribeFlightsListener = null; // 重設為 null
+    }
+
+    // 確保 userId 已有值，因為 Firestore 路徑需要它
+    if (!appState.userId) {
+        console.log("等待 userId 確定以建立 Firestore 監聽器。");
+        return;
+    }
+
+    const flightsCollectionRef = collection(db, `artifacts/${appId}/public/data/flights`);
+    const q = query(flightsCollectionRef);
+
+    // 建立新的即時監聽
+    unsubscribeFlightsListener = onSnapshot(q, (snapshot) => {
+        const flightsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log("Firestore 數據更新:", flightsData);
+        updateAppStateAndRender({ flights: flightsData }); // 更新狀態並觸發重新渲染
+    }, (err) => {
+        console.error("監聽航班數據失敗:", err);
+        updateAppStateAndRender({ error: "無法載入航班數據。" });
+    });
+    console.log("Firestore 航班數據監聽器已啟動。");
+};
+
+
+// 頁面載入完成後執行主邏輯
 window.addEventListener('load', async () => {
-    // Initial Firebase Auth attempt
+    // 嘗試進行 Firebase 認證 (自訂 token 或匿名)
     try {
         if (initialAuthToken) {
             try {
@@ -657,10 +723,10 @@ window.addEventListener('load', async () => {
     } catch (e) {
         console.error("Firebase認證初始化失敗:", e);
         updateAppStateAndRender({ error: `Firebase認證初始化失敗: ${e.message}` });
-        return; // Stop if initial auth fails critically
+        return; // 如果初始認證嚴重失敗，則停止執行
     }
 
-    // Listen to Auth State Changes
+    // 監聽 Firebase 認證狀態變化
     onAuthStateChanged(auth, (user) => {
         let newUserId = null;
         if (user) {
@@ -669,38 +735,22 @@ window.addEventListener('load', async () => {
         } else {
             console.log("onAuthStateChanged: 用戶已登出。");
         }
+        // 更新狀態，包括 currentUser 和 userId，並標記載入完成
         updateAppStateAndRender({ currentUser: user, userId: newUserId, loading: false });
-        // After auth state is determined and userId is available, set up the flights listener
-        if (newUserId) {
+
+        // 一旦用戶 ID 確定且應用程式不再載入中，就啟動 Firestore 數據監聽器
+        if (newUserId && !appState.loading) {
              setupFlightsListener();
+        } else if (!newUserId) {
+            // 如果用戶登出，確保取消 Firestore 監聽
+            if (unsubscribeFlightsListener) {
+                unsubscribeFlightsListener();
+                unsubscribeFlightsListener = null;
+                console.log("Firestore 航班數據監聽器已停止。");
+            }
         }
     });
 
-    // Initial call to render the app shell while loading
+    // 初始渲染應用程式的外殼，顯示載入中訊息
     renderApp();
 });
-
-// Separate function for setting up the Firestore listener to control its lifecycle
-let unsubscribeFlightsListener = null;
-const setupFlightsListener = () => {
-    if (unsubscribeFlightsListener) {
-        unsubscribeFlightsListener(); // Unsubscribe previous listener if exists
-    }
-
-    if (!appState.userId) { // Ensure we have a userId before trying to listen
-        console.log("等待 userId 確定以建立 Firestore 監聽器。");
-        return;
-    }
-
-    const flightsCollectionRef = collection(db, `artifacts/${appId}/public/data/flights`);
-    const q = query(flightsCollectionRef);
-
-    unsubscribeFlightsListener = onSnapshot(q, (snapshot) => {
-        const flightsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log("Firestore 數據更新:", flightsData);
-        updateAppStateAndRender({ flights: flightsData }); // Update state and re-render
-    }, (err) => {
-        console.error("監聽航班數據失敗:", err);
-        updateAppStateAndRender({ error: "無法載入航班數據。" });
-    });
-};
