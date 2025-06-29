@@ -66,10 +66,16 @@ const AIRLINES = [
     { name: '東森快運航空', id: 'ETEX' },
 ];
 
-// 全域的星期名稱映射表
-const DAY_NAMES_MAP = {
+// 全域的星期名稱映射表 (用於 title 屬性，保留完整中文)
+const DAY_NAMES_MAP_FULL = {
     "Mon": "星期一", "Tue": "星期二", "Wed": "星期三", "Thu": "星期四",
     "Fri": "星期五", "Sat": "星期六", "Sun": "星期日"
+};
+
+// 全域的星期數字映射表 (用於顯示在卡片上)
+const DAY_NAMES_MAP_SHORT = {
+    "Mon": "1", "Tue": "2", "Wed": "3", "Thu": "4",
+    "Fri": "5", "Sat": "6", "Sun": "7"
 };
 
 // --- 工具函數 ---
@@ -103,12 +109,12 @@ const get24HourTime = (isoString) => {
  * @returns {string} 渲染成 HTML 標籤的星期幾字串
  */
 const formatDays = (daysArray) => {
-    // 現在使用全域的 DAY_NAMES_MAP
+    // 現在使用全域的 DAY_NAMES_MAP_FULL 和 DAY_NAMES_MAP_SHORT
     return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => `
         <span class="inline-block w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
             daysArray.includes(day) ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'
-        }" title="${DAY_NAMES_MAP[day]}">
-            ${DAY_NAMES_MAP[day]}
+        }" title="${DAY_NAMES_MAP_FULL[day]}">
+            ${DAY_NAMES_MAP_SHORT[day]}
         </span>
     `).join('');
 };
@@ -693,7 +699,7 @@ const renderFlightForm = () => {
                             <input type="checkbox" value="${day}"
                                 class="form-checkbox h-5 w-5 text-blue-600 rounded-md focus:ring-blue-500"
                                 ${formValues.availableDays.includes(day) ? 'checked' : ''} />
-                            <span class="ml-2 text-base">${DAY_NAMES_MAP[day]}</span>
+                            <span class="ml-2 text-base">${DAY_NAMES_MAP_FULL[day]}</span>
                         </label>
                     `).join('')}
                 </div>
@@ -956,7 +962,7 @@ window.addEventListener('load', async () => {
                     }
                 } else {
                     await signInAnonymously(auth); // 沒有自訂 token，直接匿名登入
-                    console.log("沒有自訂 token，直接匿名登入。");
+                    console.log("匿名登入成功 (fallback)。");
                 }
             } catch (e) {
                 console.error("Firebase認證初始化失敗:", e);
