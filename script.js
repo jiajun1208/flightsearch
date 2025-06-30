@@ -384,20 +384,62 @@ const renderFlightSearch = () => {
     if (appState.hasSearched) {
         // 根據當前的 appState 進行航班過濾
         let currentFilteredFlights = appState.flights.filter(flight => {
-            const searchDepartureTerm = appState.searchDeparture.toLowerCase();
-            const searchDepartureCityTerm = appState.searchDepartureCity.toLowerCase();
-            const searchDestinationTerm = appState.searchDestination.toLowerCase();
-            const searchDestinationCityTerm = appState.searchDestinationCity.toLowerCase();
+            const searchDepartureTerm = appState.searchDeparture.toLowerCase().trim();
+            const searchDepartureCityTerm = appState.searchDepartureCity.toLowerCase().trim();
+            const searchDestinationTerm = appState.searchDestination.toLowerCase().trim();
+            const searchDestinationCityTerm = appState.searchDestinationCity.toLowerCase().trim();
 
-            const matchDeparture = (searchDepartureTerm === '' || flight.departure.toLowerCase().includes(searchDepartureTerm)) ||
-                                   (searchDepartureCityTerm === '' || (flight.departureCity && flight.departureCity.toLowerCase().includes(searchDepartureCityTerm)));
-            
-            const matchDestination = (searchDestinationTerm === '' || flight.destination.toLowerCase().includes(searchDestinationTerm)) ||
-                                     (searchDestinationCityTerm === '' || (flight.destinationCity && flight.destinationCity.toLowerCase().includes(searchDestinationCityTerm)));
+            let matchDeparture = false;
+            // 如果出發地機場和城市搜尋欄位都為空，則出發地條件預設為真 (不篩選出發地)
+            if (searchDepartureTerm === '' && searchDepartureCityTerm === '') {
+                matchDeparture = true;
+            } else {
+                // 如果出發地機場搜尋欄位不為空，且航班的出發地機場包含該搜尋詞
+                const isAirportMatch = searchDepartureTerm !== '' && flight.departure.toLowerCase().includes(searchDepartureTerm);
+                // 如果出發地城市搜尋欄位不為空，且航班的出發城市包含該搜尋詞
+                const isCityMatch = searchDepartureCityTerm !== '' && flight.departureCity && flight.departureCity.toLowerCase().includes(searchDepartureCityTerm);
+                
+                // 只有當至少一個搜尋條件(機場或城市)存在，並且對應的航班資訊符合時，才匹配出發地
+                // 例如: 如果只輸入機場，那必須機場匹配；如果只輸入城市，那必須城市匹配；如果都輸入，則任一匹配
+                if (searchDepartureTerm !== '' && searchDepartureCityTerm !== '') {
+                    // 兩者都有輸入，任一匹配即可
+                    matchDeparture = isAirportMatch || isCityMatch;
+                } else if (searchDepartureTerm !== '') {
+                    // 只輸入機場，必須機場匹配
+                    matchDeparture = isAirportMatch;
+                } else if (searchDepartureCityTerm !== '') {
+                    // 只輸入城市，必須城市匹配
+                    matchDeparture = isCityMatch;
+                }
+            }
+
+
+            let matchDestination = false;
+            // 如果目的地機場和城市搜尋欄位都為空，則目的地條件預設為真 (不篩選目的地)
+            if (searchDestinationTerm === '' && searchDestinationCityTerm === '') {
+                matchDestination = true;
+            } else {
+                // 如果目的地機場搜尋欄位不為空，且航班的目的地機場包含該搜尋詞
+                const isAirportMatch = searchDestinationTerm !== '' && flight.destination.toLowerCase().includes(searchDestinationTerm);
+                // 如果目的地城市搜尋欄位不為空，且航班的目的地城市包含該搜尋詞
+                const isCityMatch = searchDestinationCityTerm !== '' && flight.destinationCity && flight.destinationCity.toLowerCase().includes(searchDestinationCityTerm);
+
+                // 只有當至少一個搜尋條件(機場或城市)存在，並且對應的航班資訊符合時，才匹配目的地
+                if (searchDestinationTerm !== '' && searchDestinationCityTerm !== '') {
+                    // 兩者都有輸入，任一匹配即可
+                    matchDestination = isAirportMatch || isCityMatch;
+                } else if (searchDestinationTerm !== '') {
+                    // 只輸入機場，必須機場匹配
+                    matchDestination = isAirportMatch;
+                } else if (searchDestinationCityTerm !== '') {
+                    // 只輸入城市，必須城市匹配
+                    matchDestination = isCityMatch;
+                }
+            }
 
             const matchAirline = appState.searchSelectedAirlines.length === 0 || appState.searchSelectedAirlines.includes(flight.airlineName);
 
-            // 搜尋邏輯：(出發地機場或城市符合) AND (目的地機場或城市符合) AND 航空公司符合
+            // 最終搜尋邏輯：出發地條件 AND 目的地條件 AND 航空公司條件
             return matchDeparture && matchDestination && matchAirline;
         });
 
