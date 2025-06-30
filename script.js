@@ -384,27 +384,39 @@ const renderFlightSearch = () => {
     if (appState.hasSearched) {
         // 根據當前的 appState 進行航班過濾
         let currentFilteredFlights = appState.flights.filter(flight => {
-            const matchDepartureAirport = appState.searchDeparture === '' || flight.departure.toLowerCase().includes(appState.searchDeparture.toLowerCase());
-            const matchDepartureCity = appState.searchDepartureCity === '' || (flight.departureCity && flight.departureCity.toLowerCase().includes(appState.searchDepartureCity.toLowerCase()));
+            const searchDepartureTerm = appState.searchDeparture.toLowerCase();
+            const searchDepartureCityTerm = appState.searchDepartureCity.toLowerCase();
+            const searchDestinationTerm = appState.searchDestination.toLowerCase();
+            const searchDestinationCityTerm = appState.searchDestinationCity.toLowerCase();
+
+            const matchDeparture = (searchDepartureTerm === '' || flight.departure.toLowerCase().includes(searchDepartureTerm)) ||
+                                   (searchDepartureCityTerm === '' || (flight.departureCity && flight.departureCity.toLowerCase().includes(searchDepartureCityTerm)));
             
-            const matchDestinationAirport = appState.searchDestination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
-            const matchDestinationCity = appState.searchDestinationCity === '' || (flight.destinationCity && flight.destinationCity.toLowerCase().includes(appState.searchDestinationCity.toLowerCase()));
+            const matchDestination = (searchDestinationTerm === '' || flight.destination.toLowerCase().includes(searchDestinationTerm)) ||
+                                     (searchDestinationCityTerm === '' || (flight.destinationCity && flight.destinationCity.toLowerCase().includes(searchDestinationCityTerm)));
 
             const matchAirline = appState.searchSelectedAirlines.length === 0 || appState.searchSelectedAirlines.includes(flight.airlineName);
 
-            // 搜尋邏輯：出發地機場或城市符合 AND 目的地機場或城市符合 AND 航空公司符合
-            return (matchDepartureAirport || matchDepartureCity) && (matchDestinationAirport || matchDestinationCity) && matchAirline;
+            // 搜尋邏輯：(出發地機場或城市符合) AND (目的地機場或城市符合) AND 航空公司符合
+            return matchDeparture && matchDestination && matchAirline;
         });
 
         // 根據選擇的排序方式進行排序
         if (appState.sortOrder === 'departureTime') {
-            currentFilteredFlights.sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
+            currentFilteredFlights.sort((a, b) => {
+                // 如果沒有起飛時間，將其視為最後
+                const timeA = a.departureTime ? new Date(a.departureTime).getTime() : Infinity;
+                const timeB = b.departureTime ? new Date(b.departureTime).getTime() : Infinity;
+                return timeA - timeB;
+            });
         } else if (appState.sortOrder === 'airlineGroup') {
             currentFilteredFlights.sort((a, b) => {
                 const airlineCompare = a.airlineName.localeCompare(b.airlineName);
                 if (airlineCompare === 0) {
-                    // 如果航空公司相同，則按起飛時間排序
-                    return new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime();
+                    // 如果航空公司相同，則按起飛時間排序 (考慮無時間的情況)
+                    const timeA = a.departureTime ? new Date(a.departureTime).getTime() : Infinity;
+                    const timeB = b.departureTime ? new Date(b.departureTime).getTime() : Infinity;
+                    return timeA - timeB;
                 }
                 return airlineCompare;
             });
@@ -470,7 +482,7 @@ const renderFlightCard = (flight) => {
                     <div class="flex flex-col items-center text-center">
                         <span class="text-3xl font-bold">${flight.departure}</span>
                         ${flight.departureCity ? `<span class="text-sm text-gray-500">(${flight.departureCity})</span>` : ''}
-                        <span class="text-lg text-gray-600 mt-1">${formatTime(flight.departureTime)}</span>
+                        <span class="text-lg text-gray-600 mt-1">${flight.departureTime ? formatTime(flight.departureTime) : 'N/A'}</span>
                     </div>
                     <div class="flex flex-col items-center justify-center h-full pt-2">
                         <span class="text-gray-500 text-base">→</span>
@@ -478,23 +490,25 @@ const renderFlightCard = (flight) => {
                     <div class="flex flex-col items-center text-center">
                         <span class="text-3xl font-bold">${flight.destination}</span>
                         ${flight.destinationCity ? `<span class="text-sm text-gray-500">(${flight.destinationCity})</span>` : ''}
-                        <span class="text-lg text-gray-600 mt-1">${formatTime(flight.arrivalTime)}</span>
+                        <span class="text-lg text-gray-600 mt-1">${flight.arrivalTime ? formatTime(flight.arrivalTime) : 'N/A'}</span>
                     </div>
                 </div>
                 
                 <!-- 這些內容預設隱藏，滑鼠移上時顯示 -->
-                <div class="flight-details-hidden opacity-0 max-h-0 overflow-hidden transition-all duration-500 ease-in-out
-                            group-hover:opacity-100 group-hover:max-h-[2000px] group-hover:border group-hover:border-red-500">
-                    <p class="text-lg text-gray-600 mb-2">
-                        飛行時長: <span class="font-semibold">${flight.flightDuration}</span>
-                    </p>
-                    <p class="text-lg text-gray-600 mb-4">
-                        機型: <span class="font-semibold">${flight.aircraftType}</span>
-                    </p>
-                    <div class="pt-4 border-t border-gray-200">
-                        <p class="text-sm font-semibold text-blue-900 mb-2">一週飛行日:</p>
-                        <div class="flex space-x-2 justify-center">
-                            ${formatDays(flight.availableDays || [])}
+                <div class="grid grid-cols-1 grid-rows-[0fr] opacity-0 transition-all duration-500 ease-in-out
+                            group-hover:opacity-100 group-hover:grid-rows-[1fr]">
+                    <div class="overflow-hidden">
+                        <p class="text-lg text-gray-600 mb-2">
+                            飛行時長: <span class="font-semibold">${flight.flightDuration || 'N/A'}</span>
+                        </p>
+                        <p class="text-lg text-gray-600 mb-4">
+                            機型: <span class="font-semibold">${flight.aircraftType || 'N/A'}</span>
+                        </p>
+                        <div class="pt-4 border-t border-gray-200">
+                            <p class="text-sm font-semibold text-blue-900 mb-2">一週飛行日:</p>
+                            <div class="flex space-x-2 justify-center">
+                                ${formatDays(flight.availableDays || [])}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -570,12 +584,12 @@ const renderAdminPanel = () => {
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     ${flight.departure} 
                                     ${flight.departureCity ? `<br>(${flight.departureCity})` : ''}
-                                    (${formatTime(flight.departureTime)})
+                                    (${flight.departureTime ? formatTime(flight.departureTime) : 'N/A'})
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     ${flight.destination}
                                     ${flight.destinationCity ? `<br>(${flight.destinationCity})` : ''}
-                                    (${formatTime(flight.arrivalTime)})
+                                    (${flight.arrivalTime ? formatTime(flight.arrivalTime) : 'N/A'})
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <button data-id="${flight.id}" class="edit-btn text-blue-600 hover:text-blue-900 mr-3 px-3 py-1 rounded-md bg-blue-100 hover:bg-blue-200 transition-colors duration-200">
@@ -622,8 +636,8 @@ const renderAdminPanel = () => {
                     adminPreviewImage: flightToEdit.airlineLogoUrl || '', // 顯示現有預覽圖
                     adminCurrentFormValues: { // 載入編輯數據到表單值
                         ...flightToEdit,
-                        departureTime: get24HourTime(flightToEdit.departureTime), // 轉為 HH:MM
-                        arrivalTime: get24HourTime(flightToEdit.arrivalTime),     // 轉為 HH:MM
+                        departureTime: flightToEdit.departureTime ? get24HourTime(flightToEdit.departureTime) : '', // 轉為 HH:MM，如果為空則給空字串
+                        arrivalTime: flightToEdit.arrivalTime ? get24HourTime(flightToEdit.arrivalTime) : '',     // 轉為 HH:MM，如果為空則給空字串
                         availableDays: flightToEdit.availableDays || []
                     }
                 });
