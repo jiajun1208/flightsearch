@@ -428,7 +428,7 @@ const renderFlightResults = (flights) => {
 const renderFlightCard = (flight) => {
     const cardDiv = document.createElement('div');
     // 添加 group class for hover effect
-    cardDiv.className = "bg-white p-6 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 flex flex-col justify-between group relative overflow-hidden"; // Added group and relative overflow-hidden
+    cardDiv.className = "bg-white p-6 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 flex flex-col justify-between group relative overflow-hidden";
     cardDiv.innerHTML = `
         <div>
             <div class="flex items-center justify-between mb-4">
@@ -459,7 +459,7 @@ const renderFlightCard = (flight) => {
                 </div>
                 
                 <!-- 這些內容預設隱藏，滑鼠移上時顯示 -->
-                <div class="flight-details-hidden opacity-0 max-h-0 overflow-hidden transition-all duration-500 ease-in-out group-hover:opacity-100 group-hover:max-h-40">
+                <div class="flight-details-hidden opacity-0 max-h-0 overflow-hidden transition-all duration-500 ease-in-out group-hover:opacity-100 group-hover:max-h-96">
                     <p class="text-lg text-gray-600 mb-2">
                         飛行時長: <span class="font-semibold">${flight.flightDuration}</span>
                     </p>
@@ -658,12 +658,12 @@ const renderFlightForm = () => {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label for="form-departureTime" class="block text-sm font-medium text-gray-700 mb-1">起飛時間 (僅時分)</label>
-                    <input type="time" id="form-departureTime" name="departureTime" value="${formValues.departureTime || ''}" required
+                    <input type="time" id="form-departureTime" name="departureTime" value="${formValues.departureTime || ''}"
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                     <label for="form-arrivalTime" class="block text-sm font-medium text-gray-700 mb-1">降落時間 (僅時分)</label>
-                    <input type="time" id="form-arrivalTime" name="arrivalTime" value="${formValues.arrivalTime || ''}" required
+                    <input type="time" id="form-arrivalTime" name="arrivalTime" value="${formValues.arrivalTime || ''}"
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
             </div>
@@ -806,8 +806,12 @@ const renderFlightForm = () => {
         currentFormData.departureTime = departureTimeInput ? new Date(`2000-01-01T${departureTimeInput}:00`).toISOString() : '';
         currentFormData.arrivalTime = arrivalTimeInput ? new Date(`2000-01-01T${arrivalTimeInput}:00`).toISOString() : '';
 
-        // 計算飛行時長
-        currentFormData.flightDuration = calculateDuration(departureTimeInput, arrivalTimeInput);
+        // 計算飛行時長，只有在兩個時間都存在時才計算
+        if (departureTimeInput && arrivalTimeInput) {
+            currentFormData.flightDuration = calculateDuration(departureTimeInput, arrivalTimeInput);
+        } else {
+            currentFormData.flightDuration = ''; // 如果時間不完整，則飛行時長為空
+        }
 
 
         // *** 修正 LOGO URL 處理邏輯 (重要！) ***
