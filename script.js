@@ -459,7 +459,8 @@ const renderFlightCard = (flight) => {
                 </div>
                 
                 <!-- 這些內容預設隱藏，滑鼠移上時顯示 -->
-                <div class="flight-details-hidden opacity-0 max-h-0 overflow-hidden transition-all duration-500 ease-in-out group-hover:opacity-100 group-hover:max-h-[999px]">
+                <div class="flight-details-hidden opacity-0 max-h-0 overflow-hidden transition-all duration-500 ease-in-out
+                            group-hover:opacity-100 group-hover:max-h-[2000px] group-hover:border group-hover:border-red-500">
                     <p class="text-lg text-gray-600 mb-2">
                         飛行時長: <span class="font-semibold">${flight.flightDuration}</span>
                     </p>
