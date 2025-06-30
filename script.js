@@ -427,8 +427,7 @@ const renderFlightResults = (flights) => {
  */
 const renderFlightCard = (flight) => {
     const cardDiv = document.createElement('div');
-    // 移除 cardDiv 上的 overflow-hidden，確保內部內容可以完全展開
-    // 將 max-h-96 調整為 max-h-[500px] 以提供更多展開空間
+    // 添加 group class for hover effect
     cardDiv.className = "bg-white p-6 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 flex flex-col justify-between group relative";
     cardDiv.innerHTML = `
         <div>
@@ -460,7 +459,7 @@ const renderFlightCard = (flight) => {
                 </div>
                 
                 <!-- 這些內容預設隱藏，滑鼠移上時顯示 -->
-                <div class="flight-details-hidden opacity-0 max-h-0 overflow-hidden transition-all duration-500 ease-in-out group-hover:opacity-100 group-hover:max-h-[500px]">
+                <div class="flight-details-hidden opacity-0 max-h-0 overflow-hidden transition-all duration-500 ease-in-out group-hover:opacity-100 group-hover:max-h-[999px]">
                     <p class="text-lg text-gray-600 mb-2">
                         飛行時長: <span class="font-semibold">${flight.flightDuration}</span>
                     </p>
