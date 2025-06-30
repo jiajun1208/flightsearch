@@ -44,6 +44,8 @@ const appState = {
     // 搜尋表單的狀態
     searchDeparture: '', // 搜尋的出發地機場
     searchDestination: '', // 搜尋的目的地機場
+    searchDepartureCity: '', // 新增：搜尋的出發城市
+    searchDestinationCity: '', // 新增：搜尋的目的地城市
     searchSelectedAirlines: [], // 搜尋選中的航空公司列表
     hasSearched: false, // 新增狀態：是否已執行過搜尋，控制結果顯示
     sortOrder: 'departureTime', // 新增狀態：搜尋結果的排序方式 ('departureTime', 'airlineGroup')
@@ -293,8 +295,14 @@ const renderFlightSearch = () => {
                 <input type="text" id="search-departure" placeholder="出發地機場 (例如: TPE)"
                     value="${appState.searchDeparture}"
                     class="w-full p-4 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-900 placeholder-blue-400 transition-all duration-300" />
+                <input type="text" id="search-departure-city" placeholder="出發城市 (例如: 台北)"
+                    value="${appState.searchDepartureCity}"
+                    class="w-full p-4 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-900 placeholder-blue-400 transition-all duration-300" />
                 <input type="text" id="search-destination" placeholder="目的地機場 (例如: NRT)"
                     value="${appState.searchDestination}"
+                    class="w-full p-4 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-900 placeholder-blue-400 transition-all duration-300" />
+                <input type="text" id="search-destination-city" placeholder="目的地城市 (例如: 東京)"
+                    value="${appState.searchDestinationCity}"
                     class="w-full p-4 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-900 placeholder-blue-400 transition-all duration-300" />
             </div>
             <div class="flex-1">
@@ -334,10 +342,18 @@ const renderFlightSearch = () => {
     departureInput.addEventListener('input', (e) => {
         appState.searchDeparture = e.target.value;
     });
+    const departureCityInput = searchDiv.querySelector('#search-departure-city');
+    departureCityInput.addEventListener('input', (e) => {
+        appState.searchDepartureCity = e.target.value;
+    });
 
     const destinationInput = searchDiv.querySelector('#search-destination');
     destinationInput.addEventListener('input', (e) => {
         appState.searchDestination = e.target.value;
+    });
+    const destinationCityInput = searchDiv.querySelector('#search-destination-city');
+    destinationCityInput.addEventListener('input', (e) => {
+        appState.searchDestinationCity = e.target.value;
     });
 
     searchDiv.querySelector('#airline-checkboxes').addEventListener('change', (e) => {
@@ -368,10 +384,16 @@ const renderFlightSearch = () => {
     if (appState.hasSearched) {
         // 根據當前的 appState 進行航班過濾
         let currentFilteredFlights = appState.flights.filter(flight => {
-            const matchDeparture = appState.searchDeparture === '' || flight.departure.toLowerCase().includes(appState.searchDeparture.toLowerCase());
-            const matchDestination = appState.searchDestination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
+            const matchDepartureAirport = appState.searchDeparture === '' || flight.departure.toLowerCase().includes(appState.searchDeparture.toLowerCase());
+            const matchDepartureCity = appState.searchDepartureCity === '' || (flight.departureCity && flight.departureCity.toLowerCase().includes(appState.searchDepartureCity.toLowerCase()));
+            
+            const matchDestinationAirport = appState.searchDestination === '' || flight.destination.toLowerCase().includes(appState.searchDestination.toLowerCase());
+            const matchDestinationCity = appState.searchDestinationCity === '' || (flight.destinationCity && flight.destinationCity.toLowerCase().includes(appState.searchDestinationCity.toLowerCase()));
+
             const matchAirline = appState.searchSelectedAirlines.length === 0 || appState.searchSelectedAirlines.includes(flight.airlineName);
-            return matchDeparture && matchDestination && matchAirline;
+
+            // 搜尋邏輯：出發地機場或城市符合 AND 目的地機場或城市符合 AND 航空公司符合
+            return (matchDepartureAirport || matchDepartureCity) && (matchDestinationAirport || matchDestinationCity) && matchAirline;
         });
 
         // 根據選擇的排序方式進行排序
@@ -447,6 +469,7 @@ const renderFlightCard = (flight) => {
                 <div class="flex justify-between items-start text-blue-800 mb-4">
                     <div class="flex flex-col items-center text-center">
                         <span class="text-3xl font-bold">${flight.departure}</span>
+                        ${flight.departureCity ? `<span class="text-sm text-gray-500">(${flight.departureCity})</span>` : ''}
                         <span class="text-lg text-gray-600 mt-1">${formatTime(flight.departureTime)}</span>
                     </div>
                     <div class="flex flex-col items-center justify-center h-full pt-2">
@@ -454,6 +477,7 @@ const renderFlightCard = (flight) => {
                     </div>
                     <div class="flex flex-col items-center text-center">
                         <span class="text-3xl font-bold">${flight.destination}</span>
+                        ${flight.destinationCity ? `<span class="text-sm text-gray-500">(${flight.destinationCity})</span>` : ''}
                         <span class="text-lg text-gray-600 mt-1">${formatTime(flight.arrivalTime)}</span>
                     </div>
                 </div>
@@ -520,8 +544,8 @@ const renderAdminPanel = () => {
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">航空公司</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">航班號</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">起飛</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">降落</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">起飛地</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">降落地</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">操作</th>
                         </tr>
                     </thead>
@@ -543,8 +567,16 @@ const renderAdminPanel = () => {
                                     ${flight.airlineName}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${flight.flightNumber}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${flight.departure} (${formatTime(flight.departureTime)})</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${flight.destination} (${formatTime(flight.arrivalTime)})</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    ${flight.departure} 
+                                    ${flight.departureCity ? `<br>(${flight.departureCity})` : ''}
+                                    (${formatTime(flight.departureTime)})
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    ${flight.destination}
+                                    ${flight.destinationCity ? `<br>(${flight.destinationCity})` : ''}
+                                    (${formatTime(flight.arrivalTime)})
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <button data-id="${flight.id}" class="edit-btn text-blue-600 hover:text-blue-900 mr-3 px-3 py-1 rounded-md bg-blue-100 hover:bg-blue-200 transition-colors duration-200">
                                         編輯
@@ -570,6 +602,7 @@ const renderAdminPanel = () => {
                 adminPreviewImage: '',
                 adminCurrentFormValues: { // 初始化表單值
                     departure: '', destination: '',
+                    departureCity: '', destinationCity: '', // 新增城市欄位初始化
                     departureTime: '', arrivalTime: '',
                     airlineName: '', flightNumber: '', aircraftType: '',
                     availableDays: []
@@ -640,8 +673,18 @@ const renderFlightForm = () => {
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
+                    <label for="form-departureCity" class="block text-sm font-medium text-gray-700 mb-1">出發城市</label>
+                    <input type="text" id="form-departureCity" name="departureCity" value="${formValues.departureCity || ''}"
+                        class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
                     <label for="form-destination" class="block text-sm font-medium text-gray-700 mb-1">目的地機場</label>
                     <input type="text" id="form-destination" name="destination" value="${formValues.destination || ''}" required
+                        class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                    <label for="form-destinationCity" class="block text-sm font-medium text-gray-700 mb-1">目的地城市</label>
+                    <input type="text" id="form-destinationCity" name="destinationCity" value="${formValues.destinationCity || ''}"
                         class="w-full p-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
